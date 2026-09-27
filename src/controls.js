@@ -1,6 +1,6 @@
 // Touch joystick (left half of screen), buttons (right), plus keyboard for PC testing.
 export function createControls() {
-  const input = { throttle: 0, steer: 0, boost: false, brake: false };
+  const input = { throttle: 0, steer: 0, boost: false, brake: false, horn: false, taps: new Set() };
   const zone = document.getElementById('stick-zone');
   const stick = document.getElementById('stick');
   const knob = document.getElementById('knob');
@@ -34,22 +34,43 @@ export function createControls() {
   zone.addEventListener('pointerup', end);
   zone.addEventListener('pointercancel', end);
 
-  const btn = { boost: false, brake: false };
-  const bind = (id, key) => {
+  // Hold buttons
+  const btn = { boost: false, brake: false, horn: false };
+  const hold = (id, key) => {
     const el = document.getElementById(id);
     const on = v => e => { e.preventDefault(); btn[key] = v; el.classList.toggle('on', v); };
     el.addEventListener('pointerdown', on(true));
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, on(false));
   };
-  bind('b-boost', 'boost');
-  bind('b-brake', 'brake');
+  hold('b-boost', 'boost');
+  hold('b-brake', 'brake');
+  hold('b-horn', 'horn');
+  // Tap buttons
+  const tap = (id, name) => {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      input.taps.add(name);
+      el.classList.add('on');
+      setTimeout(() => el.classList.remove('on'), 140);
+    });
+  };
+  tap('b-probe', 'probe');
+  tap('b-anchor', 'anchor');
+  tap('b-photo', 'photo');
+  tap('b-zoom', 'zoom');
   addEventListener('contextmenu', e => e.preventDefault());
 
   const keys = new Set();
-  addEventListener('keydown', e => keys.add(e.code));
+  const TAPKEYS = { KeyE: 'probe', KeyF: 'anchor', KeyC: 'photo', KeyZ: 'zoom', KeyM: 'map' };
+  addEventListener('keydown', e => {
+    keys.add(e.code);
+    if (!e.repeat && TAPKEYS[e.code]) input.taps.add(TAPKEYS[e.code]);
+  });
   addEventListener('keyup', e => keys.delete(e.code));
-  const k = (...codes) => codes.some(c => keys.has(c)) ? 1 : 0;
-  const dz = v => Math.abs(v) < 0.12 ? 0 : v;
+  addEventListener('blur', () => keys.clear());
+  const k = (...codes) => (codes.some(c => keys.has(c)) ? 1 : 0);
+  const dz = v => (Math.abs(v) < 0.12 ? 0 : v);
   const clamp = v => Math.max(-1, Math.min(1, v));
 
   function update() {
@@ -57,6 +78,7 @@ export function createControls() {
     input.throttle = clamp(-dz(sy) + k('KeyW', 'ArrowUp') - k('KeyS', 'ArrowDown'));
     input.boost = btn.boost || !!k('ShiftLeft', 'ShiftRight');
     input.brake = btn.brake || !!k('Space');
+    input.horn = btn.horn || !!k('KeyH');
   }
   return { input, update };
 }

@@ -1,29 +1,25 @@
 # Tornadion
 
-Small 3D tornado-chasing browser game (phone-first), inspired by Roblox "Twisted".
-Three.js r160 loaded from jsDelivr via an import map. No build step, no npm.
-
-## Files
-- `index.html` – canvas, HUD (FPS, speed), touch joystick + buttons, import map.
-- `src/main.js` – renderer, lights, fog, chase camera, game loop, HUD updates.
-- `src/world.js` – map (1200 m square): road grid every 200 m (x=0 / z=0 highways, rest dirt),
-  cornfields/wheat/pasture cells, town at the crossing, gas / repair / dealership (`PLACES`),
-  lakes, river at x=-500, farmsteads, trees, power poles. Exposes `surfaceAt(x,z)` and `collide(pos,r)`.
-- `src/car.js` – "Dionado" SUV model (friend's colours) and arcade driving physics.
-- `src/controls.js` – left-half floating joystick, BOOST / BRAKE buttons, WASD/arrows + Shift/Space on PC.
-
-## Performance rules
-Repeated objects are `InstancedMesh` (one draw call each), Lambert materials, no real shadows
-(blob shadow under car), pixel ratio capped at 1.5, fog hides the far map. FPS + draw calls shown top-left.
+Low-poly storm-chasing game for phone browsers (Three.js + Vite, plain JS, Web Audio).
 
 ## Run
-ES modules need a web server (double-clicking index.html won't work). Any static server works,
-e.g. `python -m http.server` in this folder, then open http://localhost:8000.
-Currently also published as a claude.ai artifact.
+    npm install
+    npm run dev      # prints a Network URL like http://192.168.x.x:5173, so open it on a phone on the same Wi-Fi
+PC keys: WASD drive, Shift boost, Space brake, E probe, F anchor, C photo, Z zoom, H horn.
 
-## Roadmap
-1. ✅ Map + drivable car
-2. One tornado (moves, grows/shrinks, EF rating, debris, flings car)
-3. Weather-balloon probe deploy/undeploy, mesonet wind readout, money
-4. Upgrades, dealership (vehicles from wishlist), repair, fuel
-5. Radar map, storms/rain/hail/lightning, day/night, twins/special tornadoes
+## Files (src/)
+- `main.js`: setup, game loop, chase/binocular camera, HUD, probes, photos, money/XP (localStorage), gas/repair pads, tow & respawn.
+- `world.js`: 1200 m map (terrain, fields, corn, roads, river/lake, 3 towns, farms, trees, fences, cows, bales, power lines, mesonets). Colliders + breakables (instanced), `kill`/rebuild after ~4 min.
+- `car.js`: Dionado SUV model + physics (wind push, fling, landing damage, dents, cracked windows, anchor spikes + shutters, fuel, smoke).
+- `weather.js`: sky, day/night, supercells (wall cloud, rain/hail curtains, lightning), local rain/hail, `windAt()`, tornado spawning & world destruction.
+- `tornado.js`: EF0-EF5 table, rope/cone/wedge shader funnel, dust + debris swirl, wind field, lifecycle, twins.
+- `debris.js`: flying trees/cars/cows/planks that orbit, get thrown and hit the player.
+- `audio.js`: synthesized engine, jet, wind/tornado roar, rain, thunder, siren, horn, SFX.
+- `util.js`: RNG/noise, `Kit` (merge flat-shaded vertex-coloured geometry), helpers.
+
+## Done (steps 1-5, mostly)
+Map, player, tornadoes, storms/weather, damage, probes, photos, mesonet readout, anchor, binoculars, XP.
+
+## Next
+- Radar/storm map canvas with tornado tracks, damage surveys (tornado.damage[] already records hits), menu (relaxed mode, leaderboard).
+- Then steps 7-12: dealership & vehicles, upgrades, mutant tornadoes, polish, hosting.
