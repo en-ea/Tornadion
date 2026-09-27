@@ -1,0 +1,47 @@
+<title>Tornadion</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
+<style>
+  :root { color-scheme: dark; --ink: #ffffff; --shade: rgba(10, 14, 30, .45); --boost: #ff8a1f; --brake: #e63946; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #9fd3ea; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    font-family: "Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif; color: var(--ink); }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .txt { text-shadow: 0 2px 0 rgba(0,0,0,.45); }
+  #fps { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
+    font: 13px/1.2 ui-monospace, Menlo, Consolas, monospace; background: var(--shade); padding: 4px 8px; border-radius: 6px; }
+  #speed { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    font-size: 36px; letter-spacing: .02em; font-variant-numeric: tabular-nums; pointer-events: none; }
+  #speed small { font-size: 16px; margin-left: 4px; }
+  #hint { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+    font-size: 16px; background: var(--shade); padding: 6px 14px; border-radius: 20px; white-space: nowrap; transition: opacity 1s; pointer-events: none; }
+  #stick-zone { position: fixed; left: 0; top: 0; bottom: 0; width: 50%; }
+  #stick { position: fixed; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.55); background: rgba(10,14,30,.22); pointer-events: none; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px; border-radius: 50%;
+    background: rgba(255,255,255,.9); box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+  .btns { position: fixed; right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    display: flex; gap: 14px; align-items: flex-end; }
+  .btn { width: 86px; height: 86px; border-radius: 50%; border: 3px solid rgba(255,255,255,.85); color: var(--ink);
+    font: inherit; font-size: 17px; letter-spacing: .04em; box-shadow: 0 4px 0 rgba(0,0,0,.35); touch-action: none; }
+  #b-brake { background: var(--brake); width: 72px; height: 72px; }
+  #b-boost { background: var(--boost); margin-bottom: 40px; }
+  .btn.on { transform: translateY(3px) scale(.94); box-shadow: 0 1px 0 rgba(0,0,0,.35); filter: brightness(1.2); }
+</style>
+
+<canvas id="game"></canvas>
+<div id="stick-zone"></div>
+<div id="stick"><div id="knob"></div></div>
+<div class="btns">
+  <button class="btn txt" id="b-brake">BRAKE</button>
+  <button class="btn txt" id="b-boost">BOOST</button>
+</div>
+<div id="fps">-- fps</div>
+<div id="speed" class="txt">0<small>mph</small></div>
+<div id="hint" class="txt">Left thumb: drive · Orange: jet boost</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="src/main.js"></script>

@@ -1,0 +1,229 @@
+<title>Tornado Chaser Wishlist</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Figtree:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#eef2f1; --card:#ffffff; --ink:#1c2826; --muted:#5b6b68;
+  --line:#cfd8d6; --accent:#2f7d6d; --accent-ink:#ffffff; --warn:#d98a1c; --panel:#e2e9e7;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){color-scheme:dark;
+    --bg:#141c1b; --card:#1d2826; --ink:#e4ecea; --muted:#9aaba7;
+    --line:#33423f; --accent:#5cc0a8; --accent-ink:#0e1614; --warn:#f0a93a; --panel:#18221f;}
+}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#141c1b; --card:#1d2826; --ink:#e4ecea; --muted:#9aaba7;
+  --line:#33423f; --accent:#5cc0a8; --accent-ink:#0e1614; --warn:#f0a93a; --panel:#18221f;}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Figtree,system-ui,sans-serif;padding-inline:16px;padding-block:20px 110px}
+.wrap{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font:700 1.9rem/1.1 "Chakra Petch",system-ui,sans-serif;margin:0;text-wrap:balance}
+h1 span{color:var(--warn)}
+.intro{color:var(--muted);margin:6px 0 0}
+nav{display:flex;flex-wrap:wrap;gap:6px}
+nav a{font-size:.85rem;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:4px 9px;background:var(--card)}
+.cat{background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;scroll-margin-top:12px}
+.cat>h2{font:700 1.25rem/1.2 "Chakra Petch",system-ui,sans-serif;margin:0;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.cat>h2 .n{font:600 .8rem Figtree,system-ui,sans-serif;color:var(--muted)}
+.grp{display:flex;flex-direction:column;gap:8px}
+h3{font:600 .78rem "Chakra Petch",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--muted)}
+h3 small{text-transform:none;letter-spacing:0;font-family:Figtree,system-ui,sans-serif;font-weight:400}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:600 .92rem/1.25 Figtree,system-ui,sans-serif;padding:9px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;text-align:left}
+.chip small{display:block;font-weight:400;font-size:.78rem;color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip[aria-pressed="true"] small{color:var(--accent-ink);opacity:.85}
+.chip:focus-visible,textarea:focus-visible,.copy:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+textarea{width:100%;box-sizing:border-box;min-height:96px;padding:12px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:center}
+.copy{font:700 1.05rem "Chakra Petch",system-ui,sans-serif;padding:14px 26px;border-radius:12px;border:0;background:var(--warn);color:#1a1205;cursor:pointer}
+#status{color:var(--muted);font-size:.9rem}
+#out{display:none}
+#car{width:100%;max-width:420px;align-self:center;background:var(--card);border-radius:12px;border:1.5px solid var(--line)}
+#vname{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+#custom{display:flex;flex-direction:column;gap:14px}
+#colours{gap:12px}
+.colrow{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 14px}
+.colhead{grid-column:1/-1;display:flex;align-items:center;gap:8px}
+.colhead .hex{margin-left:auto;color:var(--muted);font-size:.8rem;font-variant-numeric:tabular-nums}
+.sw{width:22px;height:22px;border-radius:6px;border:1px solid var(--line)}
+.colrow label{display:flex;flex-direction:column;font-size:.78rem;color:var(--muted)}
+.colrow input{width:100%;accent-color:var(--accent)}
+.hue{appearance:none;-webkit-appearance:none;height:10px;border-radius:5px;margin-top:6px;background:linear-gradient(90deg,red,#ff0,lime,cyan,blue,#f0f,red)}
+.hue::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #333}
+.hue::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid #333}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Tornado Chaser <span>Wishlist</span></h1>
+    <p class="intro">Inspired by Roblox storm chasing games like Twisted. Tap everything you'd like, and tap again to unselect. At the end, press <b>Copy answers</b> and send the text back.</p>
+  </header>
+  <nav id="nav"></nav>
+  <div id="form" style="display:contents"></div>
+  <section class="cat" id="c-custom">
+    <h2>Design your own vehicle<span class="n"></span></h2>
+    <svg id="car" viewBox="0 0 320 150" role="img" aria-label="Preview of your vehicle">
+      <g id="dish" hidden><rect x="150" y="18" width="6" height="22" fill="#666"/><ellipse cx="153" cy="18" rx="28" ry="9" fill="#ddd" stroke="#888"/></g>
+      <g id="lightbar" hidden><rect x="120" y="36" width="70" height="7" rx="3" fill="#e33"/><rect x="155" y="36" width="35" height="7" rx="3" fill="#33e"/></g>
+      <g id="rack" hidden><rect x="228" y="44" width="62" height="10" fill="#444"/><circle cx="240" cy="40" r="7" fill="#f5a623"/><circle cx="258" cy="40" r="7" fill="#f5a623"/><circle cx="276" cy="40" r="7" fill="#f5a623"/></g>
+      <path id="cab" d="M70 60 L110 44 H210 L230 60 Z" fill="#888"/>
+      <rect id="body" x="30" y="58" width="262" height="46" rx="10" fill="#888"/>
+      <rect id="stripe" x="30" y="74" width="262" height="9" fill="#fff"/>
+      <path id="win" d="M84 58 L112 48 H158 V58 Z M164 58 V48 H206 L220 58 Z" fill="#335"/>
+      <g id="armour" hidden><rect x="30" y="58" width="262" height="46" rx="10" fill="none" stroke="#333" stroke-width="5" stroke-dasharray="14 6"/><rect x="84" y="50" width="136" height="4" fill="#333"/></g>
+      <rect id="skirt" x="36" y="100" width="250" height="14" fill="#333" hidden/>
+      <rect id="light" x="282" y="66" width="10" height="8" rx="2" fill="#ff8"/>
+      <g id="wheels"><circle cx="85" cy="108" r="22" fill="#222"/><circle cx="240" cy="108" r="22" fill="#222"/><circle class="rim" cx="85" cy="108" r="10" fill="#aaa"/><circle class="rim" cx="240" cy="108" r="10" fill="#aaa"/></g>
+    </svg>
+    <div class="grp">
+      <h3><label for="vname">Vehicle name</label></h3>
+      <input id="vname" type="text" placeholder="e.g. The Vortex Crusher" maxlength="40">
+    </div>
+    <div id="custom"></div>
+    <div class="grp" id="colours"><h3>Colours <small>(drag the sliders)</small></h3></div>
+  </section>
+
+  <section class="cat" id="c-extra">
+    <h2><label for="extra">Anything else?</label></h2>
+    <textarea id="extra" placeholder="Favourite vehicles from Twisted, a name for the game, colours, crazy ideas..."></textarea>
+  </section>
+  <textarea id="out" aria-hidden="true"></textarea>
+</div>
+
+<div class="bar">
+  <button class="copy" id="copy">Copy answers</button>
+  <span id="status" role="status"></span>
+</div>
+
+<script>
+// [category, [[group, multi?, [option or "Option|hint"]]]]
+const DATA=[
+ ["Vehicles",[
+  ["Dealership cars (like Twisted)",1,["1992 Chevron 454 SS|old-school sport pickup","Chevron Zafiro|cheap starter car","2018 Sumo Woodlands XT|SUV","1995 Bullhorn Buffalo 3500|heavy old pickup","2006 Bullhorn Buffalo 1500|pickup","2017 Bullhorn Buffalo 3500|big modern pickup","Chase van with roof lights"]],
+  ["Interceptors (like Twisted / real life)",1,["Dominator 1|armoured SUV, drops skirts to the ground","Dominator 2|armoured pickup, hydraulic anchor spikes","Dominator 3|top interceptor, armour + anchors + probe launcher","TIV 1|homemade armoured tank on a truck","TIV 2|huge armoured tank with a roof turret camera","SRV (Storm Research Vehicle)|tough science truck"]],
+  ["Radar trucks",1,["DOW (Doppler on Wheels)|truck with a big dish, shows storms on the map","Rapid-scan radar truck|faster radar updates","Mesonet car|roof weather sensors"]],
+  ["Emergency vehicles (like Twisted EMS)",1,["2015 F350 Ambulance|rescue hurt people after tornadoes","2015 F350 Brush Truck|fire truck for fields","2015 Pierce Rescue Truck|big fire rescue truck"]],
+  ["Fun extras",1,["Quad bike","Dirt bike","Monster truck","Tractor (farm joke vehicle)","Helicopter","Drone you fly over storms"]]
+ ]],
+ ["Vehicle upgrades",[
+  ["Upgrades",1,["Engine / top speed","Armour plating","Heavier weight (harder to fling)","Better tyres (off-road grip)","Bulletproof / hail-proof windows","Ground anchors","Nitro boost","Bigger probe storage","Fuel tank size"]],
+  ["Customising",1,["Paint colours","Stickers and decals","Roof light bars","Sirens / horns","Name your vehicle","Garage to show off your cars"]]
+ ]],
+ ["Probes and gear",[
+  ["Probe types",1,["Turtle probe|low flat probe on the ground","Pod probe|tough capsule","Weather balloon|goes up into the storm","Rocket probe|fire it into the funnel","Camera probe|films from inside","Drone probe|fly it in yourself"]],
+  ["Gear",1,["Handheld anemometer (wind meter)","Binoculars","Camera for photos","Rain gauge","Hail collector"]]
+ ]],
+ ["Earning money",[
+  ["Ways to earn",1,["Probe hits (closer = more money)","Photos of tornadoes|better shot = more money","Video recording","Measuring the highest wind","Getting inside the tornado (core punch)","Damage surveys after the storm|rate the tornado EF0-EF5","Selling data to a TV station","Daily missions","Rescuing stranded people","Storm reports"]]
+ ]],
+ ["Tornadoes",[
+  ["Tornado shapes",1,["Rope tornado|thin and twisty","Cone tornado","Wedge tornado|huge and wide","Multi-vortex|little vortices spinning around it","Stovepipe","Rain-wrapped (hard to see)","Waterspout over a lake","Landspout / dust devil"]],
+  ["Tornado behaviour",1,["EF0-EF5 ratings","Grows and shrinks over its life","Changes direction suddenly","Rope-out ending","Multiple tornadoes at once","Satellite tornadoes","Twin tornadoes","Very rare EF5 monster","Sucks up and throws objects","Leaves a damage path on the ground"]]
+ ]],
+ ["Storms and weather",[
+  ["Storm clouds",1,["Supercell with a wall cloud","Rotating wall cloud before touchdown","Shelf clouds","Mammatus clouds after the storm","Lightning strikes","Rain","Hail (can crack windows)","Strong winds pushing your car","Flooded roads"]],
+  ["Forecasting",1,["Radar / storm map","Hook echo on radar","Storm forecast for the day (risk levels)","Tornado warnings and sirens","Weather radio alerts","Wind speed readout"]]
+ ]],
+ ["The world",[
+  ["Map",1,["Open plains","Farmland and cornfields","Dirt roads and highways","Small towns","Big city","Hills and forests","Lakes and rivers","Very big map"]],
+  ["Places",1,["Gas stations (refuel)","Repair shop","Home base / HQ","Car dealership","Barns, silos and windmills","Houses that get destroyed","Trailer parks"]],
+  ["Time",1,["Day / night","Sunsets and sunrises","Different seasons"]]
+ ]],
+ ["Danger and damage",[
+  ["Your vehicle",1,["Vehicle health bar","Visible dents and damage","Windows break","Flat tyres","Getting flung into the air","Car gets destroyed (respawn)","Running out of fuel"]],
+  ["The world",1,["Flying debris (trees, fences, cars)","Buildings get destroyed","Power lines fall","Trees fall across roads","Towns can be rebuilt later"]]
+ ]],
+ ["Progress and friends",[
+  ["Progress",1,["Levels and XP","Achievements / badges","Leaderboard of best intercepts","Record: closest to a tornado","Record: strongest tornado seen","Chase log / storm history","Photo album"]],
+  ["Play style",1,["Solo","Chase with friends (online)","Race other chasers to the tornado","Relaxed mode (no damage)","Hardcore mode (lose your car)"]]
+ ]],
+ ["Camera, controls and look",[
+  ["Camera",0,["Behind the car","Top-down","Can switch between both","Plus a first-person dashboard view"]],
+  ["Controls",1,["Joystick left, buttons right","Tilt the phone to steer","Tap buttons for gas and brake","Auto-drive to a map marker"]],
+  ["Look",0,["Simple low-poly","Cartoony","Realistic-ish"]],
+  ["Sound",1,["Engine sounds","Tornado roar","Thunder","Warning sirens","Music"]]
+ ]]
+];
+const form=document.getElementById('form'),nav=document.getElementById('nav');
+DATA.forEach(([cat,groups],ci)=>{
+  const s=document.createElement('section');s.className='cat';s.id='c'+ci;
+  s.innerHTML=`<h2>${cat}<span class="n"></span></h2>`;
+  groups.forEach(g=>s.appendChild(makeGroup(cat,...g)));
+  form.appendChild(s);
+  nav.insertAdjacentHTML('beforeend',`<a href="#c${ci}">${cat}</a>`);
+});
+nav.insertAdjacentHTML('beforeend','<a href="#c-custom">Your own vehicle</a><a href="#c-extra">Anything else</a>');
+function makeGroup(cat,g,multi,opts){
+  const d=document.createElement('div');d.className='grp';d.dataset.q=cat+' / '+g;if(multi)d.dataset.multi=1;
+  d.innerHTML=`<h3>${g} <small>(${multi?'pick any':'pick one'})</small></h3><div class="chips">`+
+    opts.map(o=>{const[a,h]=o.split('|');return `<button class="chip" aria-pressed="false" data-v="${a}">${a}${h?`<small>${h}</small>`:''}</button>`}).join('')+'</div>';
+  return d;
+}
+// Custom vehicle builder
+const CUSTOM=[
+ ["Base vehicle",0,["Pickup truck","SUV","Van","Armoured tank truck","Tracked tank","Monster truck","Semi truck"]],
+ ["Size",0,["Small and fast","Medium","Huge and heavy"]],
+ ["Armour",0,["None","Light plates","Heavy plates","Full tank armour"]],
+ ["Engine",0,["Stock","Big V8","Turbo","Jet booster"]],
+ ["Tyres",0,["Road tyres","Off-road tyres","Monster tyres","Tank tracks"]],
+ ["Windows",0,["Normal","Tinted","Armoured slits","Metal shutters"]],
+ ["Roof gear",1,["Radar dish","Light bar","Probe rack","Roof camera turret","Weather sensors","Spotlights"]],
+ ["Special abilities",1,["Ground anchor spikes","Armour skirts to the ground","Nitro boost","Probe launcher cannon","Hail-proof glass","Self-repair","Extra fuel tank"]],
+ ["Decals",1,["Racing stripe","Flames","Lightning bolts","Tornado logo","Number on the side","Hazard stripes","Camo"]],
+ ["Horn",0,["Normal horn","Air horn","Tornado siren","Funny horn"]]
+];
+const cust=document.getElementById('custom');
+CUSTOM.forEach(g=>cust.appendChild(makeGroup('Custom vehicle',...g)));
+const PARTS=[["Body","body",0,70,45],["Cabin / roof","cab",0,0,85],["Stripe / trim","stripe",45,90,55],["Rims","rim",0,0,70],["Windows","win",220,40,22],["Headlights","light",55,100,75]];
+const colBox=document.getElementById('colours');
+function hsl2hex(h,s,l){s/=100;l/=100;const f=n=>{const k=(n+h/30)%12,c=l-s*Math.min(l,1-l)*Math.max(-1,Math.min(k-3,9-k,1));return Math.round(c*255).toString(16).padStart(2,'0')};return '#'+f(0)+f(8)+f(4)}
+PARTS.forEach(([name,id,h,s,l])=>{
+  const r=document.createElement('div');r.className='colrow';r.dataset.part=name;r.dataset.id=id;
+  r.innerHTML=`<div class="colhead"><span class="sw"></span><b>${name}</b><span class="hex"></span></div>
+  <label>Colour<input type="range" id="${id}-h" min="0" max="360" value="${h}" class="hue"></label>
+  <label>Strength<input type="range" id="${id}-s" min="0" max="100" value="${s}"></label>
+  <label>Brightness<input type="range" id="${id}-l" min="5" max="95" value="${l}"></label>`;
+  colBox.appendChild(r);
+});
+function paint(){
+  colBox.querySelectorAll('.colrow').forEach(r=>{
+    const [h,s,l]=[...r.querySelectorAll('input')].map(i=>+i.value),hex=hsl2hex(h,s,l);
+    r.dataset.hex=hex;r.querySelector('.sw').style.background=hex;r.querySelector('.hex').textContent=hex;
+    document.querySelectorAll('#car #'+r.dataset.id+',#car .'+r.dataset.id).forEach(el=>el.setAttribute('fill',hex));
+  });
+  const has=v=>!!document.querySelector(`#c-custom .chip[data-v="${v}"][aria-pressed="true"]`);
+  document.getElementById('dish').hidden=!has('Radar dish');
+  document.getElementById('lightbar').hidden=!has('Light bar');
+  document.getElementById('rack').hidden=!has('Probe rack');
+  document.getElementById('skirt').hidden=!has('Armour skirts to the ground');
+  document.getElementById('armour').hidden=!['Light plates','Heavy plates','Full tank armour'].some(has);
+  document.getElementById('stripe').style.display=has('Racing stripe')||has('Hazard stripes')||!document.querySelector('#c-custom [data-q$="Decals"] [aria-pressed="true"]')?'':'none';
+}
+colBox.addEventListener('input',paint);paint();
+function count(sec){const n=sec.querySelectorAll('.chip[aria-pressed="true"]').length;sec.querySelector('.n').textContent=n?n+' picked':''}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.chip');if(!b)return;
+  const g=b.closest('.grp'),on=b.getAttribute('aria-pressed')!=='true';
+  if(!g.dataset.multi)g.querySelectorAll('.chip').forEach(o=>o.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed',on);count(b.closest('.cat'));paint();
+});
+function answers(){
+  let t='TORNADO GAME WISHLIST\n',cur='';
+  document.querySelectorAll('.grp[data-q]').forEach(g=>{
+    const [cat,grp]=g.dataset.q.split(' / ');
+    if(cat==='Custom vehicle'&&cur!==cat)t+='\nCUSTOM VEHICLE\n- Name: '+(document.getElementById('vname').value.trim()||'(none)')+'\n',cur=cat;
+    if(cat!==cur){t+='\n'+cat.toUpperCase()+'\n';cur=cat}
+    const picks=[...g.querySelectorAll('.chip[aria-pressed="true"]')].map(b=>b.dataset.v);
+    t+='- '+grp+': '+(picks.join(', ')||'(none)')+'\n';
+  });
+  t+='- Colours: '+[...colBox.querySelectorAll('.colrow')].map(r=>r.dataset.part+' '+r.dataset.hex).join(', ')+'\n';
+  t+='\nOTHER IDEAS\n'+(document.getElementById('extra').value.trim()||'(none)');
+  return t;
+}
+const status=document.getElementById('status');
+document.getElementById('copy').addEventListener('click',()=>{
+  const t=answers();
+  const fallback=()=>{const o=document.getElementById('out');o.style.display='block';o.value=t;o.select();status.textContent='Select this text and copy it'};
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>{status.textContent='Copied! Paste it in a message.'},fallback);
+  else fallback();
+});
+</script>
