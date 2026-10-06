@@ -5,7 +5,7 @@ Low-poly storm-chasing game for phone and desktop browsers (Three.js + Vite, pla
 ## Run
     npm install
     npm run dev      # prints a Network URL like http://192.168.x.x:5173, so open it on a phone on the same Wi-Fi
-    npm run build    # static site in dist/ (deploys to Vercel as-is)
+    npm run build    # static site in dist/ (Netlify builds this from GitHub, see netlify.toml)
 PC keys: WASD drive, Shift boost, Space brake, E probe, Q probe type, F anchor, C photo, V video, Z zoom, H horn, M map, Esc menu.
 
 ## Files (src/)
