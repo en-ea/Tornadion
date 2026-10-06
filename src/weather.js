@@ -222,9 +222,11 @@ export function createWeather(scene, world, audio) {
     let r = rng(), ef = 0;
     while (ef < 5 && r > EF_WEIGHTS[ef]) { r -= EF_WEIGHTS[ef]; ef++; }
     const shape = ef <= 1 ? (rng() < 0.4 ? 'rope' : 'cone') : ef <= 3 ? ['cone', 'cone', 'wedge', 'rope'][Math.floor(rng() * 4)] : (rng() < 0.65 ? 'wedge' : 'cone');
-    const main = new Tornado(scene, world, storm, { ef, shape, offset: { x: storm.lx * -10, z: storm.lz * -10 } });
+    const r2 = rng(), special = r2 < 0.1 ? ['multi', 'fire', 'mega', 'drifter'][Math.floor(rng() * 4)] : null;
+    if (special === 'multi') ef = Math.max(ef, 3);
+    const main = new Tornado(scene, world, storm, { ef, shape, offset: { x: storm.lx * -10, z: storm.lz * -10 }, special });
     storm.tornadoes.push(main); W.tornadoes.push(main);
-    if (rng() < 0.18) {
+    if (!special && rng() < 0.18) {
       const ef2 = Math.max(0, ef - Math.floor(rng() * 3));
       const tw = new Tornado(scene, world, storm, { ef: ef2, shape: ef2 >= 4 ? 'wedge' : rng() < 0.5 ? 'rope' : 'cone', offset: { x: storm.lx * 120, z: storm.lz * 120 }, twin: true });
       storm.tornadoes.push(tw); W.tornadoes.push(tw);

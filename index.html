@@ -38,6 +38,22 @@
   #b-zoom { right: 144px; bottom: 80px; width: 56px; height: 56px; }
   #b-horn { right: 0; bottom: 172px; width: 50px; height: 50px; font-size: 11px; }
   #b-anchor.act { background: #1700eb; }
+  #radar { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 140px; height: 140px; border-radius: 50%; border: 3px solid rgba(255,255,255,.8); box-shadow: 0 3px 0 rgba(0,0,0,.3); background: #56753f; }
+  #radar.big { width: min(88vmin, 560px); height: min(88vmin, 560px); border-radius: 12px; top: 50%; right: 50%; transform: translate(50%, -50%); z-index: 5; }
+  #menu-btn { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(158px + env(safe-area-inset-right)); width: 42px; height: 42px; border: 0; color: #fff; font-size: 22px; }
+  #warn { position: fixed; top: 44px; left: 50%; transform: translateX(-50%); background: #d9262b; padding: 4px 14px; border-radius: 8px; font-size: 16px; display: none; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .55; } }
+  #shop-btn { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); display: none; background: #1700eb; color: #fff; font: inherit; font-size: 18px; border: 3px solid #fff; border-radius: 14px; padding: 10px 18px; }
+  .overlay { position: fixed; inset: 0; background: rgba(8,10,24,.72); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .overlay.hidden { display: none; }
+  .card { background: #1b1f3a; border: 3px solid #fff; border-radius: 16px; padding: 14px 16px; width: min(92vw, 520px); max-height: 86vh; overflow-y: auto; font-size: 15px; }
+  .card h2 { margin: 0 0 6px; color: #fff9b3; } .card h3 { margin: 12px 0 4px; }
+  .card label { display: block; margin: 6px 0; } .card small { display: block; opacity: .8; font-family: system-ui, sans-serif; font-size: 12px; }
+  .card button { font: inherit; background: #ff8a1f; color: #fff; border: 0; border-radius: 10px; padding: 7px 12px; margin: 4px 4px 0 0; }
+  .card button:disabled { background: #555a70; }
+  .item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #ffffff22; }
+  .item button { flex: none; }
+  #start .card { text-align: center; } #start h1 { margin: 0; font-size: 44px; color: #fff; text-shadow: 0 4px 0 #1700eb; }
 </style>
 </head>
 <body>
@@ -65,6 +81,31 @@
   <button class="btn" id="b-zoom">ZOOM</button>
   <button class="btn" id="b-horn">HORN</button>
 </div>
+<canvas id="radar"></canvas>
+<button id="menu-btn" class="panel">☰</button>
+<div id="warn"></div>
+<button id="shop-btn">🚗 OPEN DEALERSHIP</button>
+<div id="menu" class="overlay hidden"><div class="card">
+  <h2>TORNADION</h2>
+  <label><input type="checkbox" id="o-relaxed"> Relaxed mode (no damage)</label>
+  <label><input type="checkbox" id="o-shadows"> Shadows (turn off if laggy)</label>
+  <label><input type="checkbox" id="o-sound"> Sound</label>
+  <h3>🏆 Best intercepts</h3><ol id="board"></ol>
+  <small>PC: WASD drive · Shift boost · Space brake · E probe · F anchor · C photo · Z binoculars · H horn · M map</small>
+  <button id="o-close">RESUME</button><button id="o-reset" style="background:#d9262b">RESET PROGRESS</button>
+</div></div>
+<div id="shop" class="overlay hidden"><div class="card">
+  <h2>🚗 Dealership · <span id="shop-money"></span></h2>
+  <h3>Vehicles</h3><div id="vlist"></div>
+  <h3>Upgrades</h3><div id="ulist"></div>
+  <button id="shop-close">LEAVE</button>
+</div></div>
+<div id="start" class="overlay"><div class="card">
+  <h1>TORNADION</h1>
+  <p>Chase supercells across the plains in the <b>Dionado</b>.</p>
+  <small>Left thumb: drive · BOOST: jet · PROBE: drop a weather balloon in the tornado's path (tap again near it to pick up) · ANCHOR: spikes + shutters so you don't get flung · PHOTO / ZOOM: binocular photos · Tap the radar for the big map · Orange flags after a tornado = damage surveys · Refuel + restock probes at ⛽, repair at 🔧, buy vehicles at 🚗</small>
+  <button>TAP TO START</button>
+</div></div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

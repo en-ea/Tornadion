@@ -5,7 +5,6 @@ import { Kit, box, cyl, clamp, rr, hash } from './util.js';
 const COL = { body: 0x1700eb, cabin: 0x3220a7, trim: 0x3c392f, rims: 0xb3b3b3, glass: 0x3c568b, lights: 0xfff9b3, armor: 0x6c7080, metal: 0x9aa0a8 };
 // Top-speed multiplier per ground type.
 const GRIP = { highway: 1, road: 0.9, grass: 0.72, field: 0.62, corn: 0.5, water: 0.28 };
-const TOP = 34; // m/s on highway (~76 mph)
 
 function shape(pts) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) s.lineTo(p[0], p[1]); return s; }
 // Extrude a side profile (x = forward, y = up) across the car's width.
@@ -125,6 +124,7 @@ function wheelGeo() {
 }
 
 export function createCar(scene) {
+  let def = { id: 'dionado', len: 4.9 };
   const root = new THREE.Group();
   root.rotation.order = 'YXZ';
   const body = new THREE.Group();
@@ -132,11 +132,12 @@ export function createCar(scene) {
   scene.add(root);
 
   const bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const bodyGeo = buildModel();
-  const orig = bodyGeo.attributes.position.array.slice();
+  let bodyGeo = buildModel();
+  let orig = bodyGeo.attributes.position.array.slice();
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
   bodyMesh.castShadow = true;
-  body.add(bodyMesh, new THREE.Mesh(lightsGeo(), new THREE.MeshBasicMaterial({ vertexColors: true })));
+  const lightsMesh = new THREE.Mesh(lightsGeo(), new THREE.MeshBasicMaterial({ vertexColors: true }));
+  body.add(bodyMesh, lightsMesh);
 
   // Decals
   const sideMat = new THREE.MeshLambertMaterial({ map: logoTexture(true), transparent: true, depthWrite: false });
@@ -204,9 +205,12 @@ export function createCar(scene) {
   spikes.position.y = 0.55;
   body.add(spikes);
 
+  // Dionado-only parts (decals, cracks overlay, shutters, sensors) get hidden on other vehicles.
+  const extras = body.children.filter(o => ![bodyMesh, lightsMesh, flame, spikes].includes(o));
+
   // Off-road wheels.
   const wg = wheelGeo(), wMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const fronts = [], spins = [];
+  const fronts = [], spins = [], pivots = [];
   for (const [x, z] of [[-1.08, 1.5], [1.08, 1.5], [-1.08, -1.5], [1.08, -1.5]]) {
     const pivot = new THREE.Group();
     pivot.position.set(x, 0.62, z);
@@ -214,6 +218,7 @@ export function createCar(scene) {
     spin.castShadow = true;
     pivot.add(spin);
     root.add(pivot);
+    pivots.push(pivot);
     spins.push(spin);
     if (z > 0) fronts.push(pivot);
   }
@@ -256,8 +261,33 @@ export function createCar(scene) {
     vel: new THREE.Vector3(), spin: new THREE.Vector3(), tilt: new THREE.Vector2(),
     airborne: false, anchored: false, anchorT: 0, dead: false, relaxed: false,
     health: 100, maxHealth: 140, fuel: 100, maxFuel: 100, windows: 0,
-    mass: 1.25, armor: 1.3, hailproof: false, onEvent: null, headlights: spot, wind: { x: 0, z: 0, up: 0, speed: 0 }, airTime: 0,
+    mass: 1.25, armor: 1.3, hailproof: false, top: 34, jet: true, canAnchor: true, shutters: true, perk: null, onEvent: null, headlights: spot, wind: { x: 0, z: 0, up: 0, speed: 0 }, airTime: 0,
 
+    setVehicle(d, up = {}) {
+      def = d;
+      const g = d.build ? d.build() : { body: buildModel(), lights: lightsGeo() };
+      bodyGeo.dispose(); lightsMesh.geometry.dispose();
+      bodyGeo = g.body; orig = bodyGeo.attributes.position.array.slice();
+      bodyMesh.geometry = bodyGeo; lightsMesh.geometry = g.lights;
+      dents.length = 0;
+      const dion = d.id === 'dionado';
+      for (const o of extras) o.visible = dion && o !== shut;
+      shut.visible = false;
+      this.shutters = dion;
+      this.maxHealth = d.hp; this.health = d.hp; this.windows = 0;
+      this.mass = d.mass + (up.weight || 0) * 0.25;
+      this.armor = d.armor + (up.armor || 0) * 0.2;
+      this.top = d.top; this.jet = !!d.jet; this.canAnchor = !!d.anchor; this.perk = d.perk || null;
+      this.hailproof = !!up.windows || !!d.hailproof;
+      this.maxFuel = d.fuel || 100; this.fuel = Math.min(this.fuel, this.maxFuel);
+      const wr = d.wr || 0.62, wb = d.wb || 1.5, tr = d.track || 1.08;
+      pivots.forEach((p, i) => { p.position.set(i % 2 ? tr : -tr, wr, i < 2 ? wb : -wb); p.children[0].scale.setScalar(wr / 0.62); });
+      flame.position.set(0, d.jetY || 1.35, -(d.len / 2 + 1.05));
+      spikes.scale.set(1, 1, d.len / 4.9);
+      spot.position.set(0, 1.3, d.len / 2);
+      bodyMat.color.setHex(0xffffff);
+      this.anchored = false; this.anchorT = 0;
+    },
     reset(x, z, heading) {
       this.pos.set(x, 0, z); this.heading = heading; this.speed = 0; this.vel.set(0, 0, 0);
       this.airborne = false; this.anchored = false; this.anchorT = 0; this.dead = false;
@@ -268,6 +298,7 @@ export function createCar(scene) {
     },
     toggleAnchor() {
       if (this.airborne || this.dead) return 'no';
+      if (!this.canAnchor) return 'none';
       if (!this.anchored && Math.abs(this.speed) > 4) return 'fast';
       this.anchored = !this.anchored;
       return this.anchored ? 'on' : 'off';
@@ -291,7 +322,7 @@ export function createCar(scene) {
       }
     },
     hail(rate, dt) {
-      if (this.hailproof || this.anchorT > 0.6 || this.relaxed) return;
+      if (this.hailproof || (this.shutters && this.anchorT > 0.6) || this.relaxed) return;
       this.windows = Math.min(1, this.windows + rate * dt * 0.035);
       if (this.windows >= 1) this.damage(rate * dt * 2);
     },
@@ -340,8 +371,8 @@ export function createCar(scene) {
         const boost = input.boost && fuel && !anchored;
         const thr = anchored || !fuel ? 0 : boost ? 1 : input.throttle;
         this.boosting = boost;
-        const top = boost ? TOP * grip * 1.55 + 6 : TOP * grip * (this.health < this.maxHealth * 0.25 ? 0.7 : 1);
-        const acc = boost ? 30 : 15;
+        const top = boost ? this.top * grip * (this.jet ? 1.55 : 1.2) + 6 : this.top * grip * (this.health < this.maxHealth * 0.25 ? 0.7 : 1);
+        const acc = boost ? (this.jet ? 30 : 22) : 15 * Math.min(1.3, 1.6 / this.mass + 0.3);
         if (thr > 0.05) this.speed += (this.speed < -0.5 ? 30 : acc) * thr * dt;
         else if (thr < -0.05) this.speed += (this.speed > 0.5 ? 30 : 8) * thr * dt;
         else this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), (anchored ? 30 : 4) * dt);
@@ -413,10 +444,10 @@ export function createCar(scene) {
         body.position.y = Math.sin(performance.now() * 0.03) * rough * Math.min(1, Math.abs(this.speed) / 15);
       }
       spinner.rotation.y += (3 + w.speed * 0.5) * dt;
-      flame.visible = !!this.boosting && !this.airborne;
+      flame.visible = !!this.boosting && !this.airborne && this.jet;
       if (flame.visible) flame.scale.set(1, 0.8 + Math.random() * 0.5, 1);
       spikes.position.y = 0.55 - this.anchorT * 0.85;
-      shut.visible = this.anchorT > 0.01;
+      shut.visible = this.shutters && this.anchorT > 0.01;
       shut.scale.y = Math.max(0.01, this.anchorT);
       crackMat.opacity = this.windows * 0.9;
 

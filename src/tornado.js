@@ -13,6 +13,7 @@ const SHAPES = {
   wedge: { bot: 1.45, top: 1.8, add: 45, exp: 0.7, wig: 1 },
 };
 export const CLOUD_BASE = 112;
+export const SPECIALS = { multi: 'MULTI-VORTEX', fire: 'FIRENADO', mega: 'MEGA WEDGE', drifter: 'DRIFTER' };
 
 const VERT = /* glsl */`
 #include <common>
@@ -76,9 +77,11 @@ let uid = 0;
 const dummy = new THREE.Object3D();
 
 export class Tornado {
-  constructor(scene, world, storm, { ef, shape, offset, twin = false }) {
+  constructor(scene, world, storm, { ef, shape, offset, twin = false, special = null }) {
     this.id = ++uid;
     this.scene = scene; this.world = world; this.storm = storm;
+    this.special = special;
+    if (special === 'mega') { ef = 5; shape = 'wedge'; }
     this.ef = ef; this.shape = shape; this.twin = twin;
     this.offset = offset; this.orbitA = Math.atan2(offset.z, offset.x);
     this.pos = new THREE.Vector3(storm.meso.x + offset.x, 0, storm.meso.z + offset.z);
@@ -86,25 +89,30 @@ export class Tornado {
     this.vel = new THREE.Vector3();
     this.age = 0; this.form = 12; this.life = rr(70, 140) + ef * 12; this.ropeT = 14;
     this.Rmax = EF[ef].r * rr(0.85, 1.2); this.Vmax = EF[ef].v * rr(0.96, 1.08);
+    if (special === 'mega') { this.Rmax = rr(140, 170); this.Vmax = rr(118, 130); this.life += 40; }
+    if (special === 'multi') this.Vmax *= 1.12;
     this.R = this.Rmax * 0.4; this.V = 0; this.touch = 0;
     this.alive = true; this.track = []; this.trackT = 0; this.damage = []; this.photos = 0; this.probed = false;
 
     this.group = new THREE.Group();
-    this.outer = new THREE.Mesh(funnelGeo, funnelMat(0x8f949b, 0x6f5d49, 0.62));
-    this.inner = new THREE.Mesh(funnelGeo, funnelMat(0x5f656d, 0x57473a, 0.85));
+    const fire = special === 'fire';
+    this.outer = new THREE.Mesh(funnelGeo, fire ? funnelMat(0xff7a2a, 0x3a2a24, 0.7) : funnelMat(0x8f949b, 0x6f5d49, 0.62));
+    this.inner = new THREE.Mesh(funnelGeo, fire ? funnelMat(0xffd040, 0x802000, 0.9) : funnelMat(0x5f656d, 0x57473a, 0.85));
+    this.subs = [];
+    if (special === 'multi') for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(funnelGeo, funnelMat(0x6f757c, 0x6f5d49, 0.8)); m.frustumCulled = false; this.subs.push(m); this.group.add(m); }
     for (const m of [this.outer, this.inner]) { m.frustumCulled = false; this.group.add(m); }
     this.outer.renderOrder = 2; this.inner.renderOrder = 1;
 
-    this.dust = new THREE.InstancedMesh(dustGeo, new THREE.MeshLambertMaterial({ color: 0x8a7258, transparent: true, opacity: 0.5, flatShading: true, depthWrite: false }), 26);
+    this.dust = new THREE.InstancedMesh(dustGeo, new THREE.MeshLambertMaterial({ color: fire ? 0x3a3030 : 0x8a7258, transparent: true, opacity: 0.5, flatShading: true, depthWrite: false }), 26);
     this.dust.frustumCulled = false;
-    this.bits = new THREE.InstancedMesh(bitGeo, new THREE.MeshLambertMaterial({ color: 0x5a4632, flatShading: true }), 90);
+    this.bits = new THREE.InstancedMesh(bitGeo, fire ? new THREE.MeshBasicMaterial({ color: 0xff6a1a }) : new THREE.MeshLambertMaterial({ color: 0x5a4632, flatShading: true }), 90);
     this.bits.frustumCulled = false;
     this.seeds = Array.from({ length: 90 }, () => [Math.random(), Math.random(), Math.random(), Math.random()]);
     scene.add(this.group, this.dust, this.bits);
   }
 
-  get rating() { return 'EF' + this.ef; }
-  get label() { return `${this.rating} ${this.shape.toUpperCase()}`; }
+  get rating() { return this.special === 'mega' ? 'EF6' : 'EF' + this.ef; }
+  get label() { return this.special ? `MUTANT ${SPECIALS[this.special]} ${this.rating}` : `${this.rating} ${this.shape.toUpperCase()}`; }
   // Tangential wind speed at radius r.
   vtAt(r) { const R = this.R; return r < R ? this.V * r / R : this.V * Math.pow(R / r, 0.75); }
 
@@ -140,6 +148,7 @@ export class Tornado {
     } else {
       tx = m.x + this.offset.x + Math.sin(age * 0.11 + this.id) * 22;
       tz = m.z + this.offset.z + Math.cos(age * 0.09 + this.id) * 22;
+      if (this.special === 'drifter') { tx += Math.sin(age * 0.33) * 150; tz += Math.sin(age * 0.21 + 1) * 150; }
     }
     const px = this.pos.x, pz = this.pos.z;
     this.pos.x += (tx - px) * Math.min(1, dt * 0.8);
@@ -163,6 +172,14 @@ export class Tornado {
       u.uBend.value.set(bx, bz); u.uForm.value = smooth(0, form, age); u.uLight.value = light;
       u.uOpacity.value = (k === 1 ? 0.62 : 0.85) * fade;
     }
+
+    this.subs.forEach((sm, i) => {
+      const a = t * 1.6 + i * 2.094, ox = Math.cos(a) * this.R * 0.85, oz = Math.sin(a) * this.R * 0.85, u = sm.material.uniforms;
+      sm.position.set(ox, 0, oz);
+      u.uTime.value = t; u.uRb.value = this.R * 0.18; u.uRt.value = this.R * 0.35 + 6; u.uH.value = CLOUD_BASE - 20 - this.pos.y;
+      u.uExp.value = 1.3; u.uWig.value = 3; u.uSpin.value = 6; u.uBend.value.set(bx - ox, bz - oz);
+      u.uForm.value = smooth(0, form, age); u.uLight.value = light; u.uOpacity.value = 0.8 * fade;
+    });
 
     // Ground dust cloud
     const w = (this.V + 5) / Math.max(this.R, 8), dustAmt = smooth(form * 0.2, form, age) * fade;
@@ -197,7 +214,7 @@ export class Tornado {
     if (!this.alive) return;
     this.alive = false;
     this.scene.remove(this.group, this.dust, this.bits);
-    this.outer.material.dispose(); this.inner.material.dispose();
+    this.outer.material.dispose(); this.inner.material.dispose(); for (const m of this.subs) m.material.dispose();
     this.dust.material.dispose(); this.bits.material.dispose();
     this.dust.dispose(); this.bits.dispose();
   }
