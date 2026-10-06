@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { Kit, flatMat, box, cyl, ico, textTexture, fbm, noise, hash, rng, rr, pick, lerp, smooth } from './util.js';
+import { vehicleModel } from './car.js';
+import { VEHICLES } from './vehicles.js';
 
 // World units are metres. +z is north, and seen from above +x is west (so east is -x).
 export const HALF = 600, WATER = -0.8;
@@ -104,11 +106,11 @@ function detailTexture(dark = 200) {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d');
-  g.fillStyle = 'rgb(236,236,236)'; g.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 5000; i++) {
-    const v = rng() < 0.6 ? dark + rng() * 30 : 245 + rng() * 10;
-    g.fillStyle = `rgb(${v},${v},${v})`;
-    g.fillRect(rng() * 256, rng() * 256, 1 + rng() * 2, 1 + rng() * 2);
+  g.fillStyle = 'rgb(238,238,238)'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 2600; i++) {
+    const v = dark + 20 + rng() * 25;
+    g.fillStyle = `rgba(${v},${v},${v},0.7)`;
+    g.fillRect(rng() * 256, rng() * 256, 2 + rng() * 3, 2 + rng() * 3);
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
@@ -137,9 +139,9 @@ function roundTree() {
   k.add(cyl(0.09, 0.13, 1.6, 4), 0x6b4a2e, 0.55, 2.9, 0.1, 0, 0, -0.6);
   k.add(cyl(0.09, 0.13, 1.5, 4), 0x6b4a2e, -0.5, 2.8, -0.2, 0, 0, 0.65);
   // Clustered canopy: darker blobs underneath, lighter ones on top.
-  for (const [x, y, z, r, c] of [[0, 3.6, 0, 2.0, 0x3b7a2c], [1.1, 3.9, 0.4, 1.4, 0x3f8130], [-1.1, 3.8, -0.3, 1.45, 0x3a772b], [0.2, 4.0, -1.1, 1.3, 0x3d7d2e],
-    [-0.2, 4.0, 1.1, 1.3, 0x417f30], [0.4, 4.9, 0.2, 1.45, 0x4f9438], [-0.6, 4.8, -0.2, 1.2, 0x56993c], [0.1, 5.6, 0, 0.95, 0x62a544]]) {
-    const g = ico(r, 1); g.scale(1, 0.82, 1);
+  for (const [x, y, z, r, c] of [[0, 3.6, 0, 2.1, 0x3b7a2c], [1.1, 3.9, 0.4, 1.5, 0x3f8130], [-1.0, 3.9, -0.5, 1.5, 0x3a772b],
+    [0.3, 4.9, 0.1, 1.55, 0x4f9438], [-0.4, 5.5, -0.1, 1.05, 0x5d9f40]]) {
+    const g = ico(r, 0); g.scale(1, 0.85, 1);
     k.add(g, c, x, y, z, 0, 0, 0, 0.08);
   }
   return k.geometry();
@@ -148,7 +150,7 @@ function pineTree() {
   const k = new Kit();
   k.add(cyl(0.18, 0.28, 2, 6), 0x5e4029, 0, 1, 0);
   const tiers = [[2.1, 2.2, 1.9, 0x24603a], [1.75, 2.1, 3.1, 0x276640], [1.4, 1.9, 4.2, 0x2b6d44], [1.05, 1.7, 5.2, 0x2f7448], [0.65, 1.5, 6.1, 0x35794c]];
-  tiers.forEach(([r, h, y, c], i) => k.add(new THREE.ConeGeometry(r, h, 9), c, 0, y, 0, 0, i * 0.5, 0, 0.07));
+  tiers.forEach(([r, h, y, c], i) => k.add(new THREE.ConeGeometry(r, h, 7), c, 0, y, 0, 0, i * 0.5, 0, 0.07));
   return k.geometry();
 }
 const gable = (w, h, d, col, k, y, over = 0.5) => {
@@ -157,20 +159,19 @@ const gable = (w, h, d, col, k, y, over = 0.5) => {
 };
 // Window with a white frame, sill and two shutters, on the +z (sign = 1) or -z wall.
 function win(k, x, y, z, sign = 1, shutter = 0x3d5a73) {
-  k.add(box(1.5, 1.3, 0.1), 0xf4f4f0, x, y, z + sign * 0.05);
-  k.add(box(1.2, 1.0, 0.1), 0x5f88ad, x, y, z + sign * 0.09);
-  k.add(box(0.06, 1.0, 0.1), 0xf4f4f0, x, y, z + sign * 0.11);
-  k.add(box(1.7, 0.1, 0.25), 0xf4f4f0, x, y - 0.68, z + sign * 0.12);
-  for (const sx of [-1, 1]) k.add(box(0.42, 1.3, 0.08), shutter, x + sx * 0.98, y, z + sign * 0.06);
+  k.add(box(1.5, 1.3, 0.16), 0xf4f4f0, x, y, z + sign * 0.08);
+  k.add(box(1.2, 1.0, 0.16), 0x5f88ad, x, y, z + sign * 0.2);
+  k.add(box(0.08, 1.0, 0.1), 0xf4f4f0, x, y, z + sign * 0.3);
+  k.add(box(1.7, 0.12, 0.3), 0xf4f4f0, x, y - 0.7, z + sign * 0.15);
+  for (const sx of [-1, 1]) k.add(box(0.42, 1.3, 0.14), shutter, x + sx * 0.98, y, z + sign * 0.07);
 }
 function houseGeo() { // one-storey with a porch
   const k = new Kit();
   k.add(box(8.4, 0.5, 6.4), 0x8d877f, 0, 0.25, 0);
   k.add(box(8, 3.4, 6), 0xffffff, 0, 2.2, 0);
-  for (let i = 0; i < 6; i++) k.add(box(8.04, 0.05, 6.04), 0xe6e2da, 0, 0.9 + i * 0.55, 0);
   gable(8, 2.5, 6, 0x5b4038, k, 3.9);
   k.add(box(8.9, 0.18, 0.18), 0xf4f4f0, 0, 3.85, 3.5); k.add(box(8.9, 0.18, 0.18), 0xf4f4f0, 0, 3.85, -3.5);
-  k.add(box(1.4, 2.4, 0.12), 0xf4f4f0, 1.8, 1.7, 3.02); k.add(box(1.1, 2.2, 0.14), 0x7a4a2e, 1.8, 1.6, 3.04);
+  k.add(box(1.4, 2.4, 0.16), 0xf4f4f0, 1.8, 1.7, 3.08); k.add(box(1.1, 2.2, 0.16), 0x7a4a2e, 1.8, 1.6, 3.2);
   win(k, -1.6, 2.3, 3.0); win(k, -1.6, 2.3, -3.0, -1); win(k, 1.8, 2.3, -3.0, -1);
   k.add(box(4, 0.3, 2), 0xa89a88, 1.8, 0.5, 4); // porch
   for (const px of [0.1, 3.5]) k.add(box(0.18, 2.6, 0.18), 0xf4f4f0, px, 1.9, 4.85);
@@ -182,11 +183,10 @@ function house2Geo() { // two-storey farmhouse
   const k = new Kit();
   k.add(box(7.4, 0.5, 6.8), 0x8d877f, 0, 0.25, 0);
   k.add(box(7, 6, 6.4), 0xffffff, 0, 3.5, 0);
-  for (let i = 0; i < 10; i++) k.add(box(7.04, 0.05, 6.44), 0xe6e2da, 0, 1 + i * 0.55, 0);
   gable(7, 2.8, 6.4, 0x44494f, k, 6.5);
   for (const x of [-1.8, 1.8]) { win(k, x, 4.9, 3.2, 1, 0x2f3d2a); win(k, x, 4.9, -3.2, -1, 0x2f3d2a); win(k, x === 1.8 ? -1.8 : 1.9, 2.3, -3.2, -1, 0x2f3d2a); }
   win(k, -1.8, 2.3, 3.2, 1, 0x2f3d2a);
-  k.add(box(1.4, 2.4, 0.12), 0xf4f4f0, 1.6, 1.7, 3.22); k.add(box(1.1, 2.2, 0.14), 0x3d5a73, 1.6, 1.6, 3.24);
+  k.add(box(1.4, 2.4, 0.16), 0xf4f4f0, 1.6, 1.7, 3.28); k.add(box(1.1, 2.2, 0.16), 0x3d5a73, 1.6, 1.6, 3.4);
   k.add(box(2.6, 0.14, 1.4), 0x44494f, 1.6, 3.1, 3.8, 0.2);
   k.add(box(0.8, 2.4, 0.8), 0x9a5544, 2.2, 8.2, 0); k.add(box(1, 0.15, 1), 0x6e3e33, 2.2, 9.45, 0);
   return k.geometry();
@@ -215,11 +215,11 @@ function shopGeo() { // main-street shop with a striped awning
   k.add(box(12, 5.4, 9), 0xffffff, 0, 2.7, 0);
   k.add(box(12.4, 0.8, 9.4), 0xd8d2c6, 0, 5.8, 0);
   k.add(box(12.2, 0.3, 9.2), 0x8d877f, 0, 0.15, 0);
-  k.add(box(8.4, 2.6, 0.12), 0x2a2f36, -1, 1.9, 4.52);
-  k.add(box(8, 2.3, 0.12), 0x7fb2d6, -1, 1.9, 4.55);
-  for (const x of [-3.5, -1, 1.5]) k.add(box(0.1, 2.3, 0.14), 0x2a2f36, x, 1.9, 4.58);
-  k.add(box(1.6, 2.7, 0.12), 0x2a2f36, 4, 1.35, 4.52); k.add(box(1.3, 2.5, 0.14), 0x7fb2d6, 4, 1.3, 4.54);
-  k.add(box(10, 1, 0.16), 0x2f3a4a, 0, 4.4, 4.56);
+  k.add(box(8.4, 2.6, 0.16), 0x2a2f36, -1, 1.9, 4.56);
+  k.add(box(8, 2.3, 0.16), 0x7fb2d6, -1, 1.9, 4.68);
+  for (const x of [-3.5, -1, 1.5]) k.add(box(0.12, 2.3, 0.12), 0x2a2f36, x, 1.9, 4.8);
+  k.add(box(1.6, 2.7, 0.16), 0x2a2f36, 4, 1.35, 4.56); k.add(box(1.3, 2.5, 0.16), 0x7fb2d6, 4, 1.3, 4.68);
+  k.add(box(10, 1, 0.2), 0x2f3a4a, 0, 4.4, 4.6);
   for (let i = 0; i < 8; i++) k.add(box(1.5, 0.12, 1.9), i % 2 ? 0xf4f4f0 : 0xc23b33, -5.25 + i * 1.5, 3.45, 5.35, 0.35);
   for (const x of [-4, 4]) win(k, x, 3, -4.5, -1, 0x55606b);
   return k.geometry();
@@ -407,27 +407,37 @@ export function buildWorld(scene) {
     return hit;
   }
   const breakables = [];
+  const CHUNK = 300;
   function makeSet(geo, max, shadow = true) {
-    const mesh = new THREE.InstancedMesh(geo, flatMat, max);
-    mesh.count = 0; mesh.castShadow = shadow; mesh.receiveShadow = true; mesh.frustumCulled = false;
-    scene.add(mesh);
+    const items = [];
     const set = {
-      mesh, mats: [],
+      items,
       add(x, y, z, ry = 0, s = 1, color = 0xffffff) {
-        const i = mesh.count++;
         dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
-        set.mats[i] = dummy.matrix.clone();
-        mesh.setMatrixAt(i, dummy.matrix);
-        mesh.setColorAt(i, tmpC.set(color));
-        return i;
+        const it = { mat: dummy.matrix.clone(), color: new THREE.Color(color), hidden: false, mesh: null, i: 0, key: Math.floor((x + HALF) / CHUNK) * 64 + Math.floor((z + HALF) / CHUNK) };
+        items.push(it);
+        return it;
       },
-      show(i, on) { mesh.setMatrixAt(i, on ? set.mats[i] : ZERO); mesh.instanceMatrix.needsUpdate = true; },
+      finalize() {
+        const groups = new Map();
+        for (const it of items) { if (!groups.has(it.key)) groups.set(it.key, []); groups.get(it.key).push(it); }
+        for (const list of groups.values()) {
+          const mesh = new THREE.InstancedMesh(geo, flatMat, list.length);
+          mesh.castShadow = shadow; mesh.receiveShadow = true;
+          list.forEach((it, i) => { it.mesh = mesh; it.i = i; mesh.setMatrixAt(i, it.mat); mesh.setColorAt(i, it.color); });
+          mesh.computeBoundingSphere();
+          mesh.boundingSphere.radius += 12;
+          list.forEach(it => { if (it.hidden) mesh.setMatrixAt(it.i, ZERO); });
+          scene.add(mesh);
+        }
+      },
+      show(it, on) { it.hidden = !on; if (it.mesh) { it.mesh.setMatrixAt(it.i, on ? it.mat : ZERO); it.mesh.instanceMatrix.needsUpdate = true; } },
     };
     return set;
   }
   function breakable(kind, set, x, z, opts) {
     const y = heightAt(x, z) + (opts.dy || 0);
-    const b = { kind, set, x, z, y, alive: true, ry: opts.ry || 0, s: opts.s || 1, color: opts.color ?? 0xffffff, thr: opts.thr, r: opts.r || 0 };
+    const b = { idx: breakables.length, kind, set, x, z, y, alive: true, ry: opts.ry || 0, s: opts.s || 1, color: opts.color ?? 0xffffff, thr: opts.thr, r: opts.r || 0 };
     b.i = set.add(x, y, z, b.ry, b.s, b.color);
     breakables.push(b);
     addCollider({ x, z, r: b.r, b, solid: !!opts.solid });
@@ -453,7 +463,7 @@ export function buildWorld(scene) {
   const parkedCar = (x, z, ry) => breakable('car', sets.car, x, z, { ry, color: pick(CAR_COL), r: 2.2, thr: 44, solid: true });
 
   // ---------- towns ----------
-  const town = new Kit(), lamps = new Kit(), places = [], signs = [];
+  const town = new Kit(), lamps = new Kit(), places = [], signs = [], showroom = [];
   const sign = (text, x, y, z, ry, w = 5, bg = '#d9362b') => {
     const map = textTexture(text, { bg }), m = new THREE.Group();
     for (const back of [0, 1]) {
@@ -500,14 +510,29 @@ export function buildWorld(scene) {
       specials.push([rx, rz + 6]);
       places.push({ type: 'repair', x: rx, z: rz, r: 8, town: t.name });
     }
-    if (t.dealer) {
-      const dx = t.x + 32, dz = t.z - 30;
-      town.add(box(16, 5, 10), 0xf5f5f5, dx, y0 + 2.5, dz - 8);
-      town.add(box(16.6, 0.6, 10.6), 0x1700eb, dx, y0 + 5.3, dz - 8);
-      town.add(box(14, 3.4, 0.12), 0x9ec9e8, dx, y0 + 1.9, dz - 2.96);
-      sign('🚗 DEALER', dx, y0 + 6.8, dz - 2.9, 0, 6, '#1700eb');
-      solid(dx, dz - 8, 7.5);
-      for (const fx of [-9, 9]) { town.add(cyl(0.08, 0.08, 7, 4), 0xcccccc, dx + fx, y0 + 3.5, dz + 2); town.add(box(0.05, 1, 1.6), fx < 0 ? 0xf2c230 : 0x1700eb, dx + fx, y0 + 6.4, dz + 2.8); }
+    if (t.dealer) { // glass-fronted showroom with display cars on turntables
+      const dx = t.x + 32, dz = t.z - 30, fz = dz - 3.9;
+      town.add(box(18, 0.36, 12.4), 0xd4d4d8, dx, y0 + 0.18, dz - 8.6);
+      town.add(box(16, 0.1, 10), 0xeeeef2, dx, y0 + 0.4, dz - 9);
+      town.add(box(16.4, 5.4, 0.4), 0xf5f5f7, dx, y0 + 2.9, dz - 14.1);
+      town.add(box(16.42, 0.7, 0.42), 0x1700eb, dx, y0 + 3.2, dz - 14.1);
+      for (const sx of [-1, 1]) town.add(box(0.4, 5.4, 10.4), sx < 0 ? 0xff8a1f : 0xf5f5f7, dx + sx * 8, y0 + 2.9, dz - 9);
+      for (let i = 0; i <= 6; i++) town.add(box(0.2, 4.6, 0.24), 0x2a2f36, dx - 7.8 + i * 2.6, y0 + 2.6, fz);
+      town.add(box(16.2, 0.28, 0.28), 0x2a2f36, dx, y0 + 4.9, fz);
+      town.add(box(19.4, 0.5, 14.2), 0xf2f2f4, dx, y0 + 5.85, dz - 8.8);
+      town.add(box(19.5, 0.62, 0.32), 0x1700eb, dx, y0 + 5.85, dz - 1.75);
+      for (const cx of [-9.2, 9.2]) town.add(cyl(0.22, 0.22, 5.6, 10), 0xd0d0d6, dx + cx, y0 + 2.95, dz - 2.2);
+      town.add(box(1.3, 9.5, 0.9), 0x2a2f36, dx + 12.5, y0 + 4.75, dz + 1);
+      sign('TORNADION MOTORS', dx + 12.5, y0 + 8.6, dz + 1.5, 0, 7, '#1700eb');
+      sign('🚗 DEALERSHIP', dx, y0 + 7.0, dz - 1.6, 0, 6, '#1700eb');
+      for (let i = -3; i <= 3; i++) town.add(box(0.16, 0.05, 4.2), 0xf2f2f2, dx + i * 3.1, y0 + 0.14, dz + 5.5);
+      for (const fx of [-9.5, 9.5]) town.add(cyl(0.08, 0.08, 7, 5), 0xcccccc, dx + fx, y0 + 3.5, dz + 2.5);
+      for (let i = 0; i < 12; i++) town.add(new THREE.ConeGeometry(0.32, 0.7, 3), [0xff8a1f, 0x1700eb, 0xffd21a][i % 3], dx - 8.7 + i * 1.58, y0 + 6.3 - Math.sin(i / 11 * Math.PI) * 0.6, dz + 2.5, Math.PI);
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(15.6, 4.5, 0.06), new THREE.MeshPhongMaterial({ color: 0xa8d8f5, transparent: true, opacity: 0.28, shininess: 120, specular: 0xffffff, depthWrite: false }));
+      glass.position.set(dx, y0 + 2.6, fz + 0.05);
+      scene.add(glass);
+      showroom.push({ x: dx - 4.2, y: y0 + 0.45, z: dz - 9.2, id: 'buffalo' }, { x: dx + 4.2, y: y0 + 0.45, z: dz - 9.2, id: 'dom2' });
+      solid(dx, dz - 9, 8.5);
       specials.push([dx, dz - 5]);
       places.push({ type: 'dealer', x: dx, z: dz, r: 9, town: t.name });
     }
@@ -698,7 +723,7 @@ export function buildWorld(scene) {
   wires.frustumCulled = false;
   scene.add(wires);
   const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _m = new THREE.Matrix4();
-  function attach(p, arm, out) { return out.set(arm, 8.55, 0).applyMatrix4(p.set.mats[p.i]); }
+  function attach(p, arm, out) { return out.set(arm, 8.55, 0).applyMatrix4(p.i.mat); }
   function rebuildWires() {
     let o = 0;
     for (const [p, q] of spans) for (const arm of [-1.3, 0, 1.3]) {
@@ -719,9 +744,8 @@ export function buildWorld(scene) {
     _qb.setFromAxisAngle(_axis.set(0, 1, 0), p.ry);
     _axis.set(p.fallDir.z, 0, -p.fallDir.x).normalize();
     _q.setFromAxisAngle(_axis, p.fall * Math.PI * 0.47).multiply(_qb);
-    p.set.mats[p.i].compose(_v.set(p.x, p.y, p.z), _q, _s1);
-    p.set.mesh.setMatrixAt(p.i, p.set.mats[p.i]);
-    p.set.mesh.instanceMatrix.needsUpdate = true;
+    p.i.mat.compose(_v.set(p.x, p.y, p.z), _q, _s1);
+    p.set.show(p.i, true);
   }
 
   // ---------- mesonet stations ----------
@@ -746,14 +770,46 @@ export function buildWorld(scene) {
     scene.add(Object.assign(k.mesh(), { castShadow: true }));
   }
 
-  for (const s of Object.values(sets)) { s.mesh.instanceMatrix.needsUpdate = true; if (s.mesh.instanceColor) s.mesh.instanceColor.needsUpdate = true; }
+  for (const s of Object.values(sets)) s.finalize();
+
+  const turntables = showroom.map(sp => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(2.9, 3.0, 0.24, 28), new THREE.MeshLambertMaterial({ color: 0x2a2f3a })));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.95, 0.06, 4, 32).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x4f8dff }));
+    ring.position.y = 0.12; g.add(ring);
+    const m = vehicleModel(VEHICLES.find(v => v.id === sp.id) || VEHICLES[0]);
+    m.position.y = 0.12; g.add(m);
+    g.position.set(sp.x, sp.y, sp.z);
+    scene.add(g);
+    return g;
+  });
 
   // ---------- runtime ----------
   const dead = [];
+  function revive(b) {
+    b.alive = true;
+    const i = dead.indexOf(b);
+    if (i >= 0) dead.splice(i, 1);
+    if (b.kind === 'pole') { b.fall = 0; b.falling = false; poleMatrix(b); return true; }
+    b.set.show(b.i, true);
+    if (b.kind === 'building') sets.rubble.show(b.ri, false);
+    return false;
+  }
   const REBUILD = 240;
   return {
     HALF, WATER, heightAt, surfaceAt, zoneAt, fieldAt, waterDist, TOWNS, ROADS, LAKE, riverX, XS, ZS,
-    breakables, places, mesonets, poles, geos, lampMat, signs,
+    breakables, places, mesonets, poles, geos, lampMat, signs, remote: false,
+    deadList: () => dead.map(b => b.idx),
+    // Co-op guests mirror the host's destroyed/standing objects.
+    syncDead(list, now) {
+      const set = new Set(list);
+      let wires = false;
+      for (const b of breakables) {
+        if (!b.alive && !set.has(b.idx)) wires = revive(b) || wires;
+        else if (b.alive && set.has(b.idx)) this.kill(b, 1, 0, now);
+      }
+      if (wires) rebuildWires();
+    },
     collide(x, z, r) {
       let best = null;
       each(x, z, r + 10, o => {
@@ -775,19 +831,17 @@ export function buildWorld(scene) {
     },
     update(dt, now, carPos) {
       wNorm.offset.x += dt * 0.012; wNorm.offset.y += dt * 0.007;
+      for (const g of turntables) g.rotation.y += dt * 0.35;
       let wiresDirty = false;
       for (const p of poles) if (p.falling) {
         p.fall = Math.min(1, p.fall + dt * (0.4 + p.fall * 2));
         if (p.fall >= 1) p.falling = false;
         poleMatrix(p); wiresDirty = true;
       }
-      for (let i = dead.length - 1; i >= 0; i--) {
+      if (!this.remote) for (let i = dead.length - 1; i >= 0; i--) {
         const b = dead[i];
         if (now < b.rebuildAt || Math.hypot(b.x - carPos.x, b.z - carPos.z) < 40) continue;
-        b.alive = true; dead.splice(i, 1);
-        if (b.kind === 'pole') { b.fall = 0; b.falling = false; poleMatrix(b); wiresDirty = true; continue; }
-        b.set.show(b.i, true);
-        if (b.kind === 'building') sets.rubble.show(b.ri, false);
+        if (revive(b)) wiresDirty = true;
       }
       if (wiresDirty) rebuildWires();
     },

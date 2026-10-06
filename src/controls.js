@@ -66,6 +66,7 @@ export function createControls() {
   const keys = new Set();
   const TAPKEYS = { KeyE: 'probe', KeyF: 'anchor', KeyC: 'photo', KeyZ: 'zoom', KeyM: 'map', KeyQ: 'ptype', KeyV: 'rec' };
   addEventListener('keydown', e => {
+    if (e.target.closest?.('input, textarea')) return;
     keys.add(e.code);
     if (!e.repeat && TAPKEYS[e.code]) input.taps.add(TAPKEYS[e.code]);
   });

@@ -169,6 +169,13 @@
   .ef { text-align: left; border: 0; border-radius: 12px; padding: 10px 12px; color: #fff; box-shadow: 0 3px 0 #0006; } .ef b { font-size: 22px; font-weight: 400; display: block; } .ef small { font-family: "Nunito", sans-serif; font-weight: 700; font-size: 12px; }
   .ef0 { background: #3f8f4f; } .ef1 { background: #7c9a2c; } .ef2 { background: #b8861c; } .ef3 { background: #c4581d; } .ef4 { background: #b8292c; } .ef5 { background: #7d1d8f; }
   .help p { line-height: 1.45; }
+  #chat-btn { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(208px + env(safe-area-inset-right)); width: 44px; height: 44px; padding: 0; color: #fff; font-size: 20px; }
+  #chat-log { position: fixed; left: calc(8px + env(safe-area-inset-left)); top: calc(186px + env(safe-area-inset-top)); width: min(320px, 40vw); display: flex; flex-direction: column; gap: 3px; pointer-events: none; font-size: 13px; font-weight: 700; }
+  #chat-log div { background: rgba(12,16,36,.7); border-radius: 8px; padding: 3px 8px; transition: opacity 1s; overflow-wrap: anywhere; } #chat-log div.old { opacity: 0; }
+  #chat-bar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(48px + env(safe-area-inset-top)); width: min(520px, 94vw); z-index: 7; background: rgba(21,26,54,.95); border: 2px solid #ffffff40; border-radius: 14px; padding: 8px; }
+  #chat-quick { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; } #chat-quick button, #chat-form button { border: 0; border-radius: 9px; padding: 6px 10px; color: #fff; background: #3a4380; font-size: 13px; }
+  #chat-form { display: flex; gap: 6px; } #chat-in { flex: 1; min-width: 0; font: 700 15px "Nunito", sans-serif; padding: 8px 10px; border-radius: 9px; border: 2px solid #ffffff30; background: #0c1030; color: #fff; }
+  #chat-form button[type=submit] { background: var(--orange); }
   .vimg { width: 100%; aspect-ratio: 16/9; object-fit: contain; border-radius: 10px; background: radial-gradient(ellipse at 50% 70%, #3a4690, #151a36 70%); }
   .cust-top { display: flex; gap: 12px; align-items: center; } .cust-top img { width: 46%; max-width: 300px; }
   #loading { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 120%, #3a2a6e, #0e1226 60%); transition: opacity .5s; }
@@ -229,6 +236,12 @@
   </div>
   <canvas id="radar"></canvas>
   <button id="menu-btn" class="panel" title="Menu">☰</button>
+  <button id="chat-btn" class="panel" title="Chat" style="display:none">💬</button>
+  <div id="chat-log"></div>
+  <div id="chat-bar" class="hidden">
+    <div id="chat-quick"><button>🌪️ Tornado here!</button><button>🏃 On my way</button><button>📍 Follow me</button><button>🆘 Need help</button><button>👍 Nice!</button><button>⚓ Anchoring</button></div>
+    <form id="chat-form"><input id="chat-in" maxlength="80" placeholder="Type a message…" autocomplete="off"><button type="submit">Send</button><button type="button" id="chat-x">✕</button></form>
+  </div>
   <button id="shop-btn">🚗 ENTER DEALERSHIP</button>
   <div id="tut" class="hidden"><span id="tut-step"></span><div id="tut-text"></div><div class="row"><button id="tut-skip">Skip tutorial</button><button id="tut-next">Next ▶</button></div></div>
 </div>

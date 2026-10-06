@@ -3,7 +3,7 @@ import { hash } from './util.js';
 
 // Swaying grass tufts and wildflowers, scattered on grassy ground around the player and re-laid as they move.
 const GRASSY = new Set(['verge', 'pasture', 'town', 'wheat', 'soy']);
-const CELL = 6, RADIUS = 66;
+const CELL = 6;
 
 function tuftGeo() {
   const pos = [], col = [], base = new THREE.Color(0x2f5a1e), tip = new THREE.Color(0x9cc65a);
@@ -49,7 +49,8 @@ export function createGrass(scene, world) {
       transformed.x += sway * position.y * 0.25 * uWind;
       transformed.z += sway * position.y * 0.12 * uWind;`);
   };
-  const MAX = 5200, FMAX = 900;
+  const MAX = 3800, FMAX = 600;
+  let RADIUS = 60;
   const tufts = new THREE.InstancedMesh(tuftGeo(), mat, MAX), flowers = new THREE.InstancedMesh(flowerGeo(), mat, FMAX);
   for (const m of [tufts, flowers]) { m.frustumCulled = false; m.receiveShadow = true; m.count = 0; scene.add(m); }
   const d = new THREE.Object3D(), c = new THREE.Color(), FLOWER = [0xffffff, 0xffd94a, 0xc77dff, 0xff7aa8, 0xffffff];
@@ -97,8 +98,8 @@ export function createGrass(scene, world) {
     update(dt, pos, windSpeed = 5) {
       uni.uTime.value += dt;
       uni.uWind.value += (Math.min(4, 0.6 + windSpeed / 12) - uni.uWind.value) * Math.min(1, dt);
-      if (Math.hypot(pos.x - cx, pos.z - cz) > 12) rebuild(pos.x, pos.z);
+      if (RADIUS > 0 && Math.hypot(pos.x - cx, pos.z - cz) > 12) rebuild(pos.x, pos.z);
     },
-    set visible(v) { tufts.visible = flowers.visible = v; },
+    set radius(r) { RADIUS = r; tufts.visible = flowers.visible = r > 0; cx = 1e9; },
   };
 }

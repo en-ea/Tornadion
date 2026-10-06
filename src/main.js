@@ -62,7 +62,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xcde9f7, 200, 1500);
-const camera = new THREE.PerspectiveCamera(65, 1, 0.8, 4000);
+const camera = new THREE.PerspectiveCamera(65, 1, 1.0, 3500);
 const world = buildWorld(scene);
 const audio = createAudio();
 const car = createCar(scene);
@@ -76,7 +76,8 @@ car.reset(-3.5, -40, 0);
 function applyGraphics() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, { low: 0.75, medium: touch ? 1.1 : 1.25, high: touch ? 1.5 : 2 }[S.quality] || 1));
   renderer.shadowMap.enabled = S.shadows && S.quality !== 'low';
-  grass.visible = S.quality !== 'low';
+  renderer.shadowMap.type = S.quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  grass.radius = { low: 0, medium: 40, high: 60 }[S.quality] ?? 40;
   scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
   resize();
 }
@@ -189,7 +190,48 @@ const probes = createProbes(G);
 const jobs = createJobs(G);
 const progress = createProgress(G);
 const coop = createCoop(G);
-Object.assign(G, { probes, jobs, progress, coop });
+Object.assign(G, {
+  probes, jobs, progress, coop,
+  net: m => { if (coop.live) coop.send(m); },
+  share: (text, amount) => { if (coop.live) coop.send({ t: 'evt', text, share: Math.round(amount * 0.25) }); },
+  applyKill(i, tid) {
+    const b = world.breakables[i];
+    if (!b || !b.alive) return;
+    const t = weather.tornadoes.find(x => x.nid === tid) || weather.tornadoes.slice().sort((a, c) => Math.hypot(a.pos.x - b.x, a.pos.z - b.z) - Math.hypot(c.pos.x - b.x, c.pos.z - b.z))[0];
+    if (t) debris.destroy(b, t); else world.kill(b, 1, 0, weather.clock);
+  },
+  onNet(m, p) {
+    if (m.t === 'survey') m.list.forEach(addSurvey);
+    else if (m.t === 'svdone') { if (surveys.some(s => s.id === m.id)) toast(`👥 ${p.name} finished a damage survey`); removeSurvey(m.id); }
+    else if (m.t === 'rescue') m.list.forEach(r => jobs.spawnRescue(r.x, r.z, r.ef, r.id));
+    else if (m.t === 'rsdone') { if (jobs.rescues.some(r => r.id === m.id)) toast(`👥 ${p.name} rescued someone`); jobs.removeRescue(m.id); }
+  },
+  chat: addChat,
+});
+weather.onDestroy = (b, t) => { if (coop.live && coop.role === 'host') coop.send({ t: 'kill', i: b.idx, tid: t.id }); };
+
+// ---------- co-op chat ----------
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function addChat(name, color, text) {
+  const d = document.createElement('div');
+  d.innerHTML = `<b style="color:${color}">${esc(name)}</b> ${esc(text)}`;
+  $('chat-log').append(d);
+  while ($('chat-log').children.length > 6) $('chat-log').firstChild.remove();
+  setTimeout(() => d.classList.add('old'), 9000);
+  audio.beep();
+}
+function sendChat(text) {
+  text = (text || '').trim().slice(0, 80);
+  if (!text || !coop.live) return;
+  coop.send({ t: 'chat', text });
+  addChat(S.playerName + ' (you)', '#ffffff', text);
+}
+const openChat = on => { $('chat-bar').classList.toggle('hidden', !on); if (on) $('chat-in').focus(); else $('chat-in').blur(); };
+$('chat-btn').onclick = () => openChat($('chat-bar').classList.contains('hidden'));
+$('chat-x').onclick = () => openChat(false);
+$('chat-form').onsubmit = e => { e.preventDefault(); sendChat($('chat-in').value); $('chat-in').value = ''; openChat(false); };
+$('chat-quick').onclick = e => { const b = e.target.closest('button'); if (b) { sendChat(b.textContent); openChat(false); } };
+addEventListener('keydown', e => { if ((e.code === 'KeyT' || e.code === 'Enter') && coop.live && S.mode === 'play' && !ui.open && !e.target.closest?.('input, textarea')) { e.preventDefault(); openChat(true); } });
 ui = createUI(G);
 
 // ---------- events ----------
@@ -214,18 +256,24 @@ weather.onTornadoTurn = t => { if (t.kind !== 'devil' && t.pos.distanceTo(car.po
 // Damage surveys: after a tornado dies, flags mark where it did damage.
 const surveys = [];
 const flagGeo = (() => { const k = new Kit(); k.add(cyl(0.06, 0.06, 3, 4), 0xdddddd, 0, 1.5, 0); k.add(box(0.05, 0.7, 1.1), 0xff8a1f, 0, 2.6, 0.55); return k.geometry(); })();
+function addSurvey(s) {
+  const m = new THREE.Mesh(flagGeo, flatMat);
+  m.position.set(s.x, world.heightAt(s.x, s.z), s.z);
+  scene.add(m);
+  surveys.push({ ...s, mesh: m, until: weather.clock + 360 });
+}
+function removeSurvey(id) { const i = surveys.findIndex(s => s.id === id); if (i >= 0) { scene.remove(surveys[i].mesh); surveys.splice(i, 1); } }
 weather.onTornadoEnd = t => {
   if (t.silent || t.kind === 'devil') return;
   jobs.onTornadoEnd(t);
-  if (!t.damage.length) return;
-  const n = Math.min(4, t.damage.length);
+  if (!t.damage.length || weather.remote) return; // in co-op the host hands out the survey points
+  const n = Math.min(4, t.damage.length), list = [];
   for (let i = 0; i < n; i++) {
     const d = t.damage[Math.floor((i + 0.5) / n * t.damage.length)];
-    const m = new THREE.Mesh(flagGeo, flatMat);
-    m.position.set(d.x + 3, world.heightAt(d.x + 3, d.z + 3), d.z + 3);
-    scene.add(m);
-    surveys.push({ x: d.x + 3, z: d.z + 3, mesh: m, pay: (80 + 60 * t.ef) * bonus(t), ef: t.ef, until: weather.clock + 360 });
+    list.push({ id: `${t.id}-${i}-${Date.now() % 100000}`, x: d.x + 3, z: d.z + 3, pay: Math.round((80 + 60 * t.ef) * bonus(t)), ef: t.ef });
   }
+  list.forEach(addSurvey);
+  G.net({ t: 'survey', list });
   toast(`📋 Tornado dissipated: ${n} damage survey point${n > 1 ? 's' : ''} marked`);
 };
 function updateSurveys() {
@@ -233,6 +281,7 @@ function updateSurveys() {
     const s = surveys[i];
     s.mesh.rotation.y += 0.02;
     const hit = Math.hypot(s.x - car.pos.x, s.z - car.pos.z) < 10;
+    if (hit) G.net({ t: 'svdone', id: s.id });
     if (hit) ui.rateSurvey(s, ef => {
       const off = Math.abs(ef - s.ef);
       earn(s.pay * (off === 0 ? 1.6 : off === 1 ? 1 : 0.4), `📋 Survey: you said EF${ef}, it was EF${s.ef}${off ? '' : ' ✔'}`);
@@ -319,6 +368,7 @@ function hud(dt) {
   $('shop-btn').style.display = dealer && !S.paused ? 'block' : 'none';
   $('b-rec').style.display = S.gear.includes('video') ? '' : 'none';
   $('b-rec').classList.toggle('act', jobs.rec);
+  $('chat-btn').style.display = coop.live ? '' : 'none';
   $('b-ptype').style.display = S.gear.some(g => ['turtle', 'balloon', 'camera', 'rocket', 'drone'].includes(g)) ? '' : 'none';
 }
 $('shop-btn').onclick = () => ui.openShop();
@@ -363,7 +413,7 @@ function frame(now) {
   if (car.perk === 'heal' && !car.dead) car.repair(1.5 * dt);
   for (const t of weather.tornadoes) if (t.special === 'fire' && t.pos.distanceTo(car.pos) < t.R * 1.2) { car.damage(12 * dt); if (shockT <= 0) { shockT = 2; toast('🔥 Burning!'); } }
   radarT -= dt;
-  if (radarT <= 0) { radarT = 0.1; radar.draw(car, { probes: probes.list, surveys, rescues: jobs.rescues, friends: coop.friends(), range: car.perk === 'radar' ? 900 : 450 }); }
+  if (radarT <= 0) { radarT = 0.1; radar.draw(car, { probes: coop.live ? probes.list.concat(coop.probeDots()) : probes.list, surveys, rescues: jobs.rescues, friends: coop.friends(), range: car.perk === 'radar' ? 900 : 450 }); }
 
   // Hail, downed power lines, services, respawn.
   if (weather.info.hail > 0.05) { car.hail(weather.info.hail, dt); if (Math.random() < weather.info.hail * dt * 20) audio.clink(); }

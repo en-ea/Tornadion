@@ -374,11 +374,11 @@ export function createWeather(scene, world, audio) {
     }
     // Tornado damage to the world (checked a few times per second).
     destroyT -= dt;
-    if (destroyT <= 0 && W.debris) {
+    if (destroyT <= 0 && W.debris && !W.remote) {
       destroyT = 0.2;
       for (const t of W.tornadoes) {
         if (t.touch < 0.7) continue;
-        world.near(t.pos.x, t.pos.z, t.R * 3 + 20, b => { if (W.windAt(b.x, b.z).speed > b.thr) W.debris.destroy(b, t); });
+        world.near(t.pos.x, t.pos.z, t.R * 3 + 20, b => { if (W.windAt(b.x, b.z).speed > b.thr) { W.debris.destroy(b, t); W.onDestroy?.(b, t); } });
       }
     }
 

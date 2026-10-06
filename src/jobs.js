@@ -65,14 +65,16 @@ export function createJobs(G) {
     else G.toast('🎥 No tornado on tape');
   }
 
-  function spawnRescue(x, z, ef) {
+  function spawnRescue(x, z, ef, id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`) {
     const g = new THREE.Group(), arm = new THREE.Mesh(armGeo(), flatMat), mk = new THREE.Mesh(markerGeo, markerMat);
     g.add(new THREE.Mesh(personGeo(), flatMat), arm, mk);
     arm.position.set(0.34, 1.42, 0); mk.position.y = 3;
     g.position.set(x, G.world.heightAt(x, z), z);
     scene.add(g);
-    rescues.push({ x, z, ef, g, arm, mk, t: 0 });
+    rescues.push({ id, x, z, ef, g, arm, mk, t: 0 });
+    return { id, x, z, ef };
   }
+  function removeRescue(id) { const i = rescues.findIndex(r => r.id === id); if (i >= 0) { scene.remove(rescues[i].g); rescues.splice(i, 1); } }
 
   function onTornadoEnd(t) {
     if (S.gear.includes('anemometer') && t.peakWind > 20) {
@@ -81,9 +83,10 @@ export function createJobs(G) {
       if (mph > (S.rec.wind || 0)) { S.rec.wind = mph; amt += 150; label += ' · NEW RECORD'; }
       G.earn(amt, label);
     }
-    if (t.damage.length > 2 && t.kind !== 'devil') {
-      const n = t.ef >= 3 ? 2 : 1;
-      for (let i = 0; i < n; i++) { const d = t.damage[Math.floor((i + 0.3) / n * t.damage.length)]; spawnRescue(d.x - 5, d.z + 4, t.ef); }
+    if (t.damage.length > 2 && t.kind !== 'devil' && !weather.remote) {
+      const n = t.ef >= 3 ? 2 : 1, list = [];
+      for (let i = 0; i < n; i++) { const d = t.damage[Math.floor((i + 0.3) / n * t.damage.length)]; list.push(spawnRescue(d.x - 5, d.z + 4, t.ef)); }
+      G.net?.({ t: 'rescue', list });
       G.toast(`🆘 ${n} ${n > 1 ? 'people need' : 'person needs'} rescuing (yellow ◆ on map)`);
     }
   }
@@ -136,11 +139,11 @@ export function createJobs(G) {
       r.mk.rotation.y += 2 * dt; r.mk.position.y = 3 + Math.sin(r.t * 3) * 0.25;
       r.g.rotation.y = Math.atan2(car.pos.x - r.x, car.pos.z - r.z);
       const near = Math.hypot(r.x - car.pos.x, r.z - car.pos.z) < 8 && Math.abs(car.speed) < 3 && !car.dead;
-      if (near) { G.earn((150 + 50 * r.ef) * (car.perk === 'heal' ? 2 : 1), '🚑 Rescued a stranded person'); G.stat('rescue'); }
+      if (near) { G.earn((150 + 50 * r.ef) * (car.perk === 'heal' ? 2 : 1), '🚑 Rescued a stranded person'); G.stat('rescue'); G.net?.({ t: 'rsdone', id: r.id }); }
       if (near || r.t > 300) { scene.remove(r.g); rescues.splice(i, 1); }
     }
 
     G.setIndicator(rec ? `🔴 REC ${Math.floor(recT)}s · $${Math.round(recVal)}` : live ? '🔴 LIVE ON TV' : '');
   }
-  return { update, stat, onTornadoEnd, toggleRec, missionsHtml, rescues, get rec() { return rec; } };
+  return { update, stat, onTornadoEnd, toggleRec, missionsHtml, rescues, spawnRescue, removeRescue, get rec() { return rec; } };
 }

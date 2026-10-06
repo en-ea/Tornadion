@@ -1,6 +1,6 @@
 # Tornadion
 
-Low-poly storm-chasing game for phone and desktop browsers (Three.js + Vite, plain JS, Web Audio, PeerJS for co-op).
+Low-poly storm-chasing game for phone and desktop browsers (Three.js + Vite, plain JS, Web Audio; co-op runs over a public MQTT relay).
 
 ## Run
     npm install
@@ -19,6 +19,6 @@ PC keys: WASD drive, Shift boost, Space brake, E probe, Q probe type, F anchor, 
 - `probes.js`: pod, turtle, weather balloon, camera, rocket and drone probes.
 - `jobs.js`: daily missions, video, live TV, core punch, storm reports, rescues, gear payouts.
 - `progress.js`: achievements, chase log, photo album, records.
-- `coop.js`: online co-op (host streams weather, everyone streams their car).
+- `coop.js`: online co-op over a public MQTT relay (built-in client): shared weather, destruction, probes, surveys, rescues, chat.
 - `audio.js`: synthesized engine, wind, siren, horns, SFX and adaptive music.
 - `radar.js`, `debris.js`, `controls.js`, `util.js`.

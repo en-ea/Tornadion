@@ -116,7 +116,7 @@ export function createUI(G) {
         <button data-act="leave" class="danger">${c.role === 'host' ? 'Stop hosting' : 'Leave game'}</button>`;
       return `<label class="set"><span>Your name</span><input id="pname" maxlength="16" value="${esc(S.playerName)}" data-change="pname"></label>
         <p class="status">${esc(c.status)}</p>${main}
-        <p class="muted">Chase together over the internet (up to 4 players). The host's storms are shared; everyone keeps their own money, vehicles and progress. Chasing within 300 m of a friend gives <b>+10% money</b>.</p>`;
+        <p class="muted">Chase together over the internet from anywhere (Wi-Fi or mobile data, up to 4 players). Storms, tornado damage, damage surveys and rescues are shared, you can see each other's probes, and everyone gets a 25% team share of each probe hit. Everyone keeps their own money, vehicles and progress. Chasing within 300 m of a friend gives <b>+10% money</b>. Chat with 💬 (PC: T).</p>`;
     }],
     help: ['❓ How to play', () => `
       <div class="help">

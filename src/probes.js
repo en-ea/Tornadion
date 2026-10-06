@@ -81,6 +81,15 @@ const MODELS = {
 };
 const geos = {};
 const geo = id => (geos[id] ??= MODELS[id]());
+// Visual-only probe (used to show other players' probes in co-op).
+export function probeModel(id) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(geo(id), flatMat));
+  if (id === 'pod') { const m = new THREE.Mesh(geo('marker'), flatMat); m.position.y = 4.3; g.add(m); }
+  if (id === 'drone') g.scale.setScalar(1.5);
+  return g;
+}
+let probeUid = 0;
 
 export function createProbes(G) {
   const { scene, world, weather, car, S } = G;
@@ -102,7 +111,7 @@ export function createProbes(G) {
     g.add(new THREE.Mesh(geo(id), flatMat));
     g.position.set(x, y, z);
     scene.add(g);
-    const p = { id, group: g, pos: g.position, state: 'armed', t: 0, used: new Set() };
+    const p = { uid: ++probeUid, id, group: g, pos: g.position, state: 'armed', t: 0, used: new Set() };
     list.push(p);
     return p;
   }
@@ -113,6 +122,7 @@ export function createProbes(G) {
   }
   function scored(t, d, amount, what) {
     G.earn(amount, `${what} ${t.rating} ${Math.round(d)}m`);
+    G.share?.(`${what} ${t.rating} ${Math.round(d)}m`, amount);
     G.stat('probe'); if (t.ef >= 3) G.stat('ef3');
     G.record(t, d, amount); G.note(t, 'probe', amount);
   }
