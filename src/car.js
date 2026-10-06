@@ -116,11 +116,71 @@ function lightsGeo() {
 }
 function wheelGeo() {
   const k = new Kit();
-  k.add(cyl(0.62, 0.62, 0.5, 12), 0x1b1b20, 0, 0, 0, 0, 0, Math.PI / 2);
-  for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + Math.PI / 12; k.add(box(0.54, 0.1, 0.2), 0x232328, 0, Math.cos(a) * 0.62, Math.sin(a) * 0.62, a); }
-  k.add(cyl(0.36, 0.36, 0.52, 6), COL.rims, 0, 0, 0, 0, 0, Math.PI / 2);
-  k.add(cyl(0.12, 0.12, 0.56, 6), COL.trim, 0, 0, 0, 0, 0, Math.PI / 2);
+  // Tyre with a bulged sidewall and staggered chunky tread.
+  k.add(cyl(0.6, 0.6, 0.46, 18), 0x1b1b20, 0, 0, 0, 0, 0, Math.PI / 2);
+  k.add(cyl(0.54, 0.54, 0.52, 18), 0x26262b, 0, 0, 0, 0, 0, Math.PI / 2);
+  for (let i = 0; i < 18; i++) {
+    const a = i * Math.PI / 9;
+    for (const x of [-0.12, 0.12]) { const b = a + (x > 0 ? Math.PI / 18 : 0); k.add(box(0.22, 0.09, 0.17), 0x202024, x, Math.cos(b) * 0.61, Math.sin(b) * 0.61, b); }
+  }
+  // Dished rims with five spokes and a hub, on both faces.
+  for (const s of [-1, 1]) {
+    k.add(cyl(0.38, 0.38, 0.04, 14), COL.rims, s * 0.25, 0, 0, 0, 0, Math.PI / 2);
+    k.add(cyl(0.3, 0.3, 0.05, 14), 0x6d7078, s * 0.26, 0, 0, 0, 0, Math.PI / 2);
+    for (let i = 0; i < 5; i++) k.add(box(0.04, 0.08, 0.56), 0xc8cacf, s * 0.275, 0, 0, i * Math.PI * 0.4);
+    k.add(cyl(0.11, 0.13, 0.06, 8), COL.trim, s * 0.29, 0, 0, 0, 0, Math.PI / 2);
+  }
   return k.geometry();
+}
+// Swap a vehicle's factory body colours for a custom paint (keeps the per-face shading jitter).
+const _src = new THREE.Color(), _dst = new THREE.Color();
+function repaint(geo, from, to) {
+  const c = geo.attributes.color.array;
+  from.forEach((hex, n) => {
+    _src.set(hex); _dst.set(to).multiplyScalar(n ? 0.72 : 1);
+    const sum = _src.r + _src.g + _src.b;
+    for (let i = 0; i < c.length; i += 9) {
+      const j = (c[i] + c[i + 1] + c[i + 2]) / sum;
+      if (j < 0.93 || j > 1.07 || Math.abs(c[i] - _src.r * j) > 0.012 || Math.abs(c[i + 1] - _src.g * j) > 0.012 || Math.abs(c[i + 2] - _src.b * j) > 0.012) continue;
+      for (let v = 0; v < 9; v += 3) { c[i + v] = _dst.r * j; c[i + v + 1] = _dst.g * j; c[i + v + 2] = _dst.b * j; }
+    }
+  });
+  geo.attributes.color.needsUpdate = true;
+}
+function decalTexture(id) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  g.lineJoin = 'round';
+  if (id === 'stripes') { g.fillStyle = '#fff'; g.fillRect(0, 30, 512, 20); g.fillRect(0, 78, 512, 20); }
+  else if (id === 'flames') {
+    for (const [col, sc] of [['#e8261a', 1], ['#ff8a1a', 0.75], ['#ffe14a', 0.45]]) {
+      g.fillStyle = col; g.beginPath(); g.moveTo(0, 8);
+      const n = 5, h = 112 / n;
+      for (let i = 0; i < n; i++) {
+        const y0 = 8 + i * h, L = (230 + [90, 220, 40, 170, 10][i]) * sc;
+        g.quadraticCurveTo(L * 0.55, y0 - 6, L, y0 + h * 0.35);
+        g.quadraticCurveTo(L * 0.45, y0 + h * 0.95, 40 * sc, y0 + h);
+      }
+      g.lineTo(0, 120); g.closePath(); g.fill();
+    }
+  } else if (id === 'bolt') {
+    g.fillStyle = '#ffd21a'; g.strokeStyle = '#1b1b1f'; g.lineWidth = 6;
+    g.beginPath();
+    for (const [x, y] of [[4, 50], [220, 34], [196, 62], [508, 44], [292, 96], [314, 66], [4, 84]]) g.lineTo(x, y);
+    g.closePath(); g.fill(); g.stroke();
+  } else if (id === 'chaser') {
+    g.font = 'bold 66px "Lilita One", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 10; g.strokeStyle = '#111'; g.strokeText('STORM CHASER', 256, 66);
+    g.fillStyle = '#fff'; g.fillText('STORM CHASER', 256, 66);
+  } else if (id === 'number') {
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(256, 64, 58, 0, 7); g.fill();
+    g.lineWidth = 6; g.strokeStyle = '#111'; g.stroke();
+    g.fillStyle = '#111'; g.font = 'bold 76px "Lilita One", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('13', 256, 68);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 export function createCar(scene) {
@@ -193,6 +253,7 @@ export function createCar(scene) {
   flame.rotation.x = -Math.PI / 2; flame.position.set(0, 1.35, -3.5);
   flame.visible = false;
   body.add(flame);
+  let flameS = 1;
 
   // Ground anchor spikes.
   const spikes = new THREE.Group();
@@ -207,6 +268,29 @@ export function createCar(scene) {
 
   // Dionado-only parts (decals, cracks overlay, shutters, sensors) get hidden on other vehicles.
   const extras = body.children.filter(o => ![bodyMesh, lightsMesh, flame, spikes].includes(o));
+  const logoSides = extras.filter(o => o.material === sideMat);
+
+  // Custom side decals (placed on the body by raycasting its side).
+  const decals = [-1, 1].map(s => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.rotation.y = s * Math.PI / 2; m.visible = false; m.userData.s = s;
+    body.add(m);
+    return m;
+  });
+  const decalTex = {};
+  const ray = new THREE.Raycaster(), rayMesh = new THREE.Mesh(undefined, bodyMat), rO = new THREE.Vector3(), rD = new THREE.Vector3(-1, 0, 0);
+  const sideX = (y, z) => { ray.set(rO.set(8, y, z), rD); const h = ray.intersectObject(rayMesh)[0]; return h ? h.point.x : 0.9; };
+
+  // Roof light bar (red/blue strobes).
+  const bar = new THREE.Group();
+  const barK = new Kit();
+  barK.add(box(1.34, 0.08, 0.28), 0x1b1b1f, 0, 0, 0);
+  for (const x of [-0.5, 0.5]) barK.add(box(0.08, 0.12, 0.22), 0x2a2a2e, x, -0.08, 0);
+  bar.add(barK.mesh(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  const redM = new THREE.MeshBasicMaterial({ color: 0xff2020 }), blueM = new THREE.MeshBasicMaterial({ color: 0x2060ff }), lensG = new THREE.BoxGeometry(0.26, 0.13, 0.24);
+  for (const [x, m] of [[-0.46, redM], [-0.17, redM], [0.17, blueM], [0.46, blueM]]) { const l = new THREE.Mesh(lensG, m); l.position.set(x, 0.1, 0); bar.add(l); }
+  bar.visible = false;
+  body.add(bar);
 
   // Off-road wheels.
   const wg = wheelGeo(), wMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -261,28 +345,48 @@ export function createCar(scene) {
     vel: new THREE.Vector3(), spin: new THREE.Vector3(), tilt: new THREE.Vector2(),
     airborne: false, anchored: false, anchorT: 0, dead: false, relaxed: false,
     health: 100, maxHealth: 140, fuel: 100, maxFuel: 100, windows: 0,
-    mass: 1.25, armor: 1.3, hailproof: false, top: 34, jet: true, canAnchor: true, shutters: true, perk: null, onEvent: null, headlights: spot, wind: { x: 0, z: 0, up: 0, speed: 0 }, airTime: 0,
+    accMul: 1, offroad: 0, nitro: 0, mass: 1.25, armor: 1.3, hailproof: false, top: 34, jet: true, canAnchor: true, shutters: true, perk: null, onEvent: null, headlights: spot, wind: { x: 0, z: 0, up: 0, speed: 0 }, airTime: 0,
 
-    setVehicle(d, up = {}) {
+    setVehicle(d, up = {}, cust = {}) {
       def = d;
       const g = d.build ? d.build() : { body: buildModel(), lights: lightsGeo() };
+      if (cust.paint != null && d.paint) repaint(g.body, d.paint, cust.paint);
       bodyGeo.dispose(); lightsMesh.geometry.dispose();
       bodyGeo = g.body; orig = bodyGeo.attributes.position.array.slice();
       bodyMesh.geometry = bodyGeo; lightsMesh.geometry = g.lights;
       dents.length = 0;
       const dion = d.id === 'dionado';
       for (const o of extras) o.visible = dion && o !== shut;
+      const dec = !!cust.decal && cust.decal !== 'none';
+      if (dion && dec) for (const o of logoSides) o.visible = false;
+      rayMesh.geometry = bodyGeo;
+      const dy = (d.wr || 0.62) + 0.42, dl = Math.min(d.len * 0.5, 2.6), dx = Math.max(sideX(dy, 0), sideX(dy, dl * 0.35), sideX(dy, -dl * 0.35)) + 0.02;
+      for (const m of decals) {
+        m.visible = dec;
+        if (!dec) continue;
+        const flip = m.userData.s < 0 && cust.decal !== 'chaser' && cust.decal !== 'number', key = cust.decal + (flip ? '-f' : '');
+        if (!decalTex[key]) { const t = decalTex[key] = decalTexture(cust.decal); if (flip) { t.wrapS = THREE.RepeatWrapping; t.repeat.x = -1; t.offset.x = 1; } }
+        m.material.map = decalTex[key]; m.material.needsUpdate = true;
+        m.scale.set(dl, Math.min(0.62, dl / 4), 1);
+        m.position.set(m.userData.s * dx, dy, 0);
+      }
+      bar.visible = !!cust.bar && !!d.bar;
+      if (d.bar) bar.position.set(0, d.bar[0], d.bar[1]);
       shut.visible = false;
       this.shutters = dion;
       this.maxHealth = d.hp; this.health = d.hp; this.windows = 0;
       this.mass = d.mass + (up.weight || 0) * 0.25;
       this.armor = d.armor + (up.armor || 0) * 0.2;
-      this.top = d.top; this.jet = !!d.jet; this.canAnchor = !!d.anchor; this.perk = d.perk || null;
+      this.top = d.top * (1 + 0.06 * (up.engine || 0)); this.accMul = 1 + 0.12 * (up.engine || 0);
+      this.offroad = 0.15 * (up.tyres || 0) + (d.offroad || 0); this.nitro = up.nitro || 0;
+      this.jet = !!d.jet; this.canAnchor = !!d.anchor; this.perk = d.perk || null;
       this.hailproof = !!up.windows || !!d.hailproof;
-      this.maxFuel = d.fuel || 100; this.fuel = Math.min(this.fuel, this.maxFuel);
+      this.maxFuel = (d.fuel || 100) * (1 + 0.25 * (up.tank || 0)); this.fuel = Math.min(this.fuel, this.maxFuel);
       const wr = d.wr || 0.62, wb = d.wb || 1.5, tr = d.track || 1.08;
       pivots.forEach((p, i) => { p.position.set(i % 2 ? tr : -tr, wr, i < 2 ? wb : -wb); p.children[0].scale.setScalar(wr / 0.62); });
-      flame.position.set(0, d.jetY || 1.35, -(d.len / 2 + 1.05));
+      // Jet vehicles get the big orange jet; anything else with nitro gets a small blue exhaust flame.
+      if (this.jet) { flame.position.set(0, d.jetY || 1.35, -(d.len / 2 + 1.05)); flameS = 1; fOuter.material.color.setHex(0xff7a1a); fInner.material.color.setHex(0xffe066); }
+      else { flame.position.set(0.55, 0.5, -(d.len / 2 + 0.25)); flameS = 0.45; fOuter.material.color.setHex(0x2a8cff); fInner.material.color.setHex(0xbfe8ff); }
       spikes.scale.set(1, 1, d.len / 4.9);
       spot.position.set(0, 1.3, d.len / 2);
       bodyMat.color.setHex(0xffffff);
@@ -366,13 +470,13 @@ export function createCar(scene) {
       } else {
         const s = world.surfaceAt(this.pos.x, this.pos.z);
         this.surface = s;
-        const grip = GRIP[s];
+        const grip = GRIP[s] + (1 - GRIP[s]) * Math.min(0.6, this.offroad);
         const fuel = this.fuel > 0 && !this.dead;
         const boost = input.boost && fuel && !anchored;
         const thr = anchored || !fuel ? 0 : boost ? 1 : input.throttle;
         this.boosting = boost;
-        const top = boost ? this.top * grip * (this.jet ? 1.55 : 1.2) + 6 : this.top * grip * (this.health < this.maxHealth * 0.25 ? 0.7 : 1);
-        const acc = boost ? (this.jet ? 30 : 22) : 15 * Math.min(1.3, 1.6 / this.mass + 0.3);
+        const top = boost ? this.top * grip * ((this.jet ? 1.55 : 1.2) + 0.08 * this.nitro) + 6 : this.top * grip * (this.health < this.maxHealth * 0.25 ? 0.7 : 1);
+        const acc = boost ? (this.jet ? 30 : 22) + 4 * this.nitro : 15 * Math.min(1.3, 1.6 / this.mass + 0.3) * this.accMul;
         if (thr > 0.05) this.speed += (this.speed < -0.5 ? 30 : acc) * thr * dt;
         else if (thr < -0.05) this.speed += (this.speed > 0.5 ? 30 : 8) * thr * dt;
         else this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), (anchored ? 30 : 4) * dt);
@@ -444,8 +548,9 @@ export function createCar(scene) {
         body.position.y = Math.sin(performance.now() * 0.03) * rough * Math.min(1, Math.abs(this.speed) / 15);
       }
       spinner.rotation.y += (3 + w.speed * 0.5) * dt;
-      flame.visible = !!this.boosting && !this.airborne && this.jet;
-      if (flame.visible) flame.scale.set(1, 0.8 + Math.random() * 0.5, 1);
+      flame.visible = !!this.boosting && !this.airborne && (this.jet || this.nitro > 0);
+      if (flame.visible) flame.scale.set(flameS, flameS * (0.8 + Math.random() * 0.5), flameS);
+      if (bar.visible) { const ph = (performance.now() / 110 | 0) % 8; redM.color.setHex(ph === 0 || ph === 2 ? 0xff3030 : 0x4a0d0d); blueM.color.setHex(ph === 4 || ph === 6 ? 0x3a7cff : 0x0d1a4a); }
       spikes.position.y = 0.55 - this.anchorT * 0.85;
       shut.visible = this.shutters && this.anchorT > 0.01;
       shut.scale.y = Math.max(0.01, this.anchorT);

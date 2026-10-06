@@ -120,20 +120,33 @@ function tiv(C, A, turret) {
 }
 
 export const VEHICLES = [
-  { id: 'dionado', name: 'Dionado (custom)', price: 0, hp: 140, mass: 1.25, armor: 1.3, top: 34, probes: 3, fuel: 100, jet: true, anchor: true, len: 4.9, desc: 'Your SUV: armour plates, jet booster, anchor spikes, metal shutters' },
-  { id: 'chevron', name: '1992 Chevron 454 SS', price: 3500, hp: 100, mass: 1.0, armor: 1.0, top: 40, probes: 2, fuel: 90, len: 5.3, wb: 1.65, build: pickup, desc: 'Fast, light, easy to fling' },
-  { id: 'sumo', name: '2018 Sumo Woodlands XT', price: 8000, hp: 130, mass: 1.3, armor: 1.1, top: 36, probes: 3, fuel: 110, len: 4.9, build: suv, desc: 'Solid all-rounder' },
-  { id: 'ambulance', name: '2015 F350 Ambulance', price: 14000, hp: 180, mass: 1.6, armor: 1.2, top: 33, probes: 3, fuel: 130, len: 6.2, wb: 2.0, wr: 0.55, build: ambulance, perk: 'heal', desc: 'EMS: slowly repairs itself' },
-  { id: 'dow', name: 'DOW Doppler on Wheels', price: 28000, hp: 170, mass: 2.0, armor: 1.3, top: 31, probes: 4, fuel: 140, anchor: true, len: 6.4, wb: 2.1, build: dow, perk: 'radar', desc: 'Long-range radar, +25% probe pay' },
-  { id: 'dom1', name: 'Dominator 1', price: 40000, hp: 220, mass: 2.1, armor: 1.8, top: 33, probes: 4, fuel: 140, anchor: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, build: () => dominator(0x2b2b2b, 0xff8a1f, 1), desc: 'Armoured interceptor' },
-  { id: 'dom2', name: 'Dominator 2', price: 65000, hp: 260, mass: 2.4, armor: 2.1, top: 35, probes: 5, fuel: 150, anchor: true, hailproof: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, build: () => dominator(0x5a6068, 0xd9362b, 2), desc: 'Heavier, hail-proof glass' },
-  { id: 'dom3', name: 'Dominator 3', price: 100000, hp: 300, mass: 2.8, armor: 2.4, top: 37, probes: 6, fuel: 160, anchor: true, hailproof: true, jet: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, jetY: 1.4, build: () => dominator(0x15151a, 0x2f7dff, 3), desc: 'Top interceptor with jet boost' },
-  { id: 'tiv1', name: 'TIV 1', price: 85000, hp: 330, mass: 3.2, armor: 2.7, top: 27, probes: 4, fuel: 160, anchor: true, hailproof: true, len: 5.8, wb: 1.8, wr: 0.72, track: 1.2, build: () => tiv(0x4a4f45, 0x3a3e36, false), desc: 'Tank. Slow but almost unflingable' },
-  { id: 'tiv2', name: 'TIV 2', price: 150000, hp: 400, mass: 3.8, armor: 3.1, top: 31, probes: 6, fuel: 180, anchor: true, hailproof: true, len: 5.8, wb: 1.8, wr: 0.72, track: 1.2, build: () => tiv(0x3b3f44, 0xff8a1f, true), perk: 'camera', desc: 'IMAX turret camera: photos pay x1.5' },
+  { id: 'dionado', paint: [0x1700eb, 0x3220a7], bar: [2.64, 0.05], name: 'Dionado (custom)', price: 0, hp: 140, mass: 1.25, armor: 1.3, top: 34, probes: 3, fuel: 100, jet: true, anchor: true, len: 4.9, desc: 'Your SUV: armour plates, jet booster, anchor spikes, metal shutters' },
+  { id: 'chevron', paint: [0xc0282d], bar: [2.16, -0.2], name: '1992 Chevron 454 SS', price: 3500, hp: 100, mass: 1.0, armor: 1.0, top: 40, probes: 2, fuel: 90, len: 5.3, wb: 1.65, build: pickup, desc: 'Fast, light, easy to fling' },
+  { id: 'sumo', paint: [0x2f6b3a, 0x264f2e], bar: [2.47, -0.4], name: '2018 Sumo Woodlands XT', price: 8000, hp: 130, mass: 1.3, armor: 1.1, top: 36, probes: 3, fuel: 110, len: 4.9, build: suv, desc: 'Solid all-rounder' },
+  { id: 'ambulance', paint: [0xf4f4f4], bar: [3.27, 0.4], name: '2015 F350 Ambulance', price: 14000, hp: 180, mass: 1.6, armor: 1.2, top: 33, probes: 3, fuel: 130, len: 6.2, wb: 2.0, wr: 0.55, build: ambulance, perk: 'heal', desc: 'EMS: slowly repairs itself' },
+  { id: 'dow', paint: [0xf2f2f2], bar: [2.55, 0.75], name: 'DOW Doppler on Wheels', price: 28000, hp: 170, mass: 2.0, armor: 1.3, top: 31, probes: 4, fuel: 140, anchor: true, len: 6.4, wb: 2.1, build: dow, perk: 'radar', desc: 'Long-range radar, +25% probe pay' },
+  { id: 'dom1', paint: [0x2b2b2b], bar: [2.56, 0.15], name: 'Dominator 1', price: 40000, hp: 220, mass: 2.1, armor: 1.8, top: 33, probes: 4, fuel: 140, anchor: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, build: () => dominator(0x2b2b2b, 0xff8a1f, 1), desc: 'Armoured interceptor' },
+  { id: 'dom2', paint: [0x5a6068], bar: [2.56, 0.15], name: 'Dominator 2', price: 65000, hp: 260, mass: 2.4, armor: 2.1, top: 35, probes: 5, fuel: 150, anchor: true, hailproof: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, build: () => dominator(0x5a6068, 0xd9362b, 2), desc: 'Heavier, hail-proof glass' },
+  { id: 'dom3', paint: [0x15151a], bar: [2.56, 0.15], name: 'Dominator 3', price: 100000, hp: 300, mass: 2.8, armor: 2.4, top: 37, probes: 6, fuel: 160, anchor: true, hailproof: true, jet: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, jetY: 1.4, build: () => dominator(0x15151a, 0x2f7dff, 3), desc: 'Top interceptor with jet boost' },
+  { id: 'tiv1', paint: [0x4a4f45], bar: [2.15, 1.0], name: 'TIV 1', price: 85000, hp: 330, mass: 3.2, armor: 2.7, top: 27, probes: 4, fuel: 160, anchor: true, hailproof: true, len: 5.8, wb: 1.8, wr: 0.72, track: 1.2, build: () => tiv(0x4a4f45, 0x3a3e36, false), desc: 'Tank. Slow but almost unflingable' },
+  { id: 'tiv2', paint: [0x3b3f44], bar: [2.15, 1.0], name: 'TIV 2', price: 150000, hp: 400, mass: 3.8, armor: 3.1, top: 31, probes: 6, fuel: 180, anchor: true, hailproof: true, len: 5.8, wb: 1.8, wr: 0.72, track: 1.2, build: () => tiv(0x3b3f44, 0xff8a1f, true), perk: 'camera', desc: 'IMAX turret camera: photos pay x1.5' },
 ];
 export const UPGRADES = [
+  { id: 'engine', name: 'Engine tune', desc: '+6% top speed, quicker acceleration', prices: [2000, 6000, 14000] },
+  { id: 'tyres', name: 'Off-road tyres', desc: 'More grip on grass, fields and corn', prices: [1500, 5000, 11000] },
+  { id: 'nitro', name: 'Nitro', desc: 'Stronger boost (gives any vehicle a boost flame)', prices: [3000, 8000, 15000] },
+  { id: 'tank', name: 'Bigger fuel tank', desc: '+25% fuel', prices: [1200, 4000] },
   { id: 'weight', name: 'Heavier weight', desc: 'Harder to fling', prices: [3000, 8000, 16000] },
-  { id: 'windows', name: 'Hail-proof windows', desc: 'Hail can\'t crack glass', prices: [5000] },
+  { id: 'windows', name: 'Hail-proof windows', desc: "Hail can't crack glass", prices: [5000] },
   { id: 'probes', name: 'Bigger probe storage', desc: '+1 probe per level', prices: [2500, 6000, 12000] },
   { id: 'armor', name: 'Extra armour', desc: 'Take less damage', prices: [4000, 9000, 18000] },
+];
+export const PAINTS = [null, 0xc81e28, 0xff7a1a, 0xf2c12e, 0x2f8a3a, 0x5b6b3a, 0x1fa39a, 0x1f5fd9, 0x1700eb, 0x6b2fd9, 0xe0559a, 0xeeeeee, 0x9aa3ad, 0x1d1f24];
+export const DECALS = [['none', 'None'], ['flames', 'Flames'], ['stripes', 'Racing stripes'], ['bolt', 'Lightning bolt'], ['chaser', 'STORM CHASER'], ['number', 'Number 13']];
+export const HORNS = [['classic', 'Classic'], ['air', 'Air horn'], ['train', 'Train horn'], ['yelp', 'Police yelp']];
+export const GEAR = [
+  { id: 'anemometer', name: 'Handheld anemometer', price: 1200, desc: 'Measures peak wind near each tornado, paid when it ends' },
+  { id: 'gauge', name: 'Rain gauge', price: 800, desc: 'Sell rainfall data after driving through heavy rain' },
+  { id: 'hailbox', name: 'Hail collector', price: 1500, desc: 'Collect hailstones for researchers' },
+  { id: 'video', name: 'Video camera', price: 2000, desc: 'REC button: film tornadoes and sell the footage' },
 ];

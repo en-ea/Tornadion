@@ -1,7 +1,7 @@
 // All sounds are synthesised with the Web Audio API, so there are no audio files to load.
 export function createAudio() {
   let ctx = null, master, noiseBuf;
-  let eng, engGain, engFilt, jet, wind, rain, sirenGain, hornGain;
+  let eng, engGain, engFilt, jet, wind, rain, sirenGain, hornGain, hornFilt, hornOsc = [], hornType = 'classic';
   let enabled = true;
 
   function loop(type, freq, q = 1) {
@@ -49,11 +49,26 @@ export function createAudio() {
     siren.connect(sirenGain).connect(master);
     siren.start(); lfo.start();
 
-    // Horn: two square tones.
     hornGain = ctx.createGain(); hornGain.gain.value = 0;
-    const hf = ctx.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 1800;
-    hornGain.connect(hf).connect(master);
-    for (const f of [392, 494]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hornGain); o.start(); }
+    hornFilt = ctx.createBiquadFilter(); hornFilt.type = 'lowpass';
+    hornGain.connect(hornFilt).connect(master);
+    buildHorn();
+  }
+  // Horn styles: oscillator chords (the yelp adds a fast LFO on pitch).
+  const HORN = {
+    classic: { type: 'square', f: [392, 494], cut: 1800 },
+    air: { type: 'sawtooth', f: [220, 277, 330], cut: 1400 },
+    train: { type: 'sawtooth', f: [311, 370, 466, 554], cut: 1100 },
+    yelp: { type: 'square', f: [900], cut: 2500, lfo: [7, 350] },
+  };
+  function buildHorn() {
+    for (const o of hornOsc) o.stop();
+    hornOsc = [];
+    const h = HORN[hornType] || HORN.classic;
+    hornFilt.frequency.value = h.cut;
+    let lfoGain = null;
+    if (h.lfo) { const l = ctx.createOscillator(); lfoGain = ctx.createGain(); l.frequency.value = h.lfo[0]; lfoGain.gain.value = h.lfo[1]; l.connect(lfoGain); l.start(); hornOsc.push(l); }
+    for (const f of h.f) { const o = ctx.createOscillator(); o.type = h.type; o.frequency.value = f; lfoGain?.connect(o.frequency); o.connect(hornGain); o.start(); hornOsc.push(o); }
   }
   addEventListener('pointerdown', init);
   addEventListener('keydown', init);
@@ -113,6 +128,9 @@ export function createAudio() {
     clunk() { tone(90, 0.2, 'square', 0.18); burst({ dur: 0.15, freq: 600, vol: 0.2 }); },
     zap() { burst({ dur: 0.2, freq: 2000, type: 'bandpass', vol: 0.3, q: 4 }); },
     levelUp() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'square', 0.08, i * 0.1)); },
+    setHorn(t) { hornType = t || 'classic'; if (ctx) buildHorn(); },
+    rec() { tone(660, 0.08, 'sine', 0.12); tone(990, 0.12, 'sine', 0.12, 0.08); },
+    whoosh() { burst({ dur: 0.9, freq: 1200, type: 'bandpass', vol: 0.3, q: 0.8 }); },
     setEnabled(v) { enabled = v; if (master) master.gain.value = v ? 0.8 : 0; },
   };
 }

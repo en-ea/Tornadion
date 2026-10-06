@@ -38,6 +38,19 @@
   #b-zoom { right: 144px; bottom: 80px; width: 56px; height: 56px; }
   #b-horn { right: 0; bottom: 172px; width: 50px; height: 50px; font-size: 11px; }
   #b-anchor.act { background: #1700eb; }
+  #b-probe { font-size: 22px; line-height: 1; } #b-probe small { display: block; font-size: 10px; }
+  #b-ptype { right: 60px; bottom: 158px; width: 44px; height: 44px; font-size: 16px; background: #1fa39a; }
+  #b-rec { right: 204px; bottom: 70px; width: 46px; height: 46px; font-size: 11px; background: #8a1d1d; }
+  #b-rec.act { background: #ff2020; animation: blink 1s infinite; }
+  #vname { font-size: 12px; opacity: .85; display: block; }
+  #live { position: fixed; top: 76px; left: calc(8px + env(safe-area-inset-left)); background: #d9262b; padding: 3px 10px; border-radius: 8px; font-size: 14px; display: none; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0; }
+  .card .sw { width: 30px; height: 30px; padding: 0; margin: 0; border-radius: 8px; border: 2px solid #fff4; }
+  .card .opt { background: #2c3260; font-size: 13px; padding: 5px 9px; margin: 0; }
+  .card .sel { outline: 3px solid #fff9b3; outline-offset: 1px; } .card .opt.sel { background: #1fa39a; }
+  .card input:not([type]) { font: inherit; padding: 5px 8px; border-radius: 8px; border: 0; width: 60%; }
+  #missions small, #board small { display: inline; }
+  #rate-btns button { font-size: 18px; padding: 10px 14px; }
   #radar { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 140px; height: 140px; border-radius: 50%; border: 3px solid rgba(255,255,255,.8); box-shadow: 0 3px 0 rgba(0,0,0,.3); background: #56753f; }
   #radar.big { width: min(88vmin, 560px); height: min(88vmin, 560px); border-radius: 12px; top: 50%; right: 50%; transform: translate(50%, -50%); z-index: 5; }
   #menu-btn { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(158px + env(safe-area-inset-right)); width: 42px; height: 42px; border: 0; color: #fff; font-size: 22px; }
@@ -65,17 +78,20 @@
   <div class="bar" id="xp"><i></i></div>
   HEALTH<div class="bar" id="hp"><i></i></div>
   FUEL<div class="bar" id="fuel"><i></i></div>
-  <span id="probes"></span>
+  <span id="probes"></span><span id="vname"></span>
 </div>
 <div id="tinfo" class="panel">Waiting for storms…</div>
 <div id="toasts"></div>
+<div id="live"></div>
 <div id="speed" class="txt">0<small>mph</small><span id="wind"></span></div>
 <div id="stick-zone"></div>
 <div id="stick"><div id="knob"></div></div>
 <div id="btns">
   <button class="btn" id="b-boost">BOOST</button>
   <button class="btn" id="b-brake">BRAKE</button>
-  <button class="btn" id="b-probe">PROBE</button>
+  <button class="btn" id="b-probe">🎈<small>PROBE</small></button>
+  <button class="btn" id="b-ptype">🔁</button>
+  <button class="btn" id="b-rec">REC</button>
   <button class="btn" id="b-anchor">ANCHOR</button>
   <button class="btn" id="b-photo">PHOTO</button>
   <button class="btn" id="b-zoom">ZOOM</button>
@@ -90,20 +106,29 @@
   <label><input type="checkbox" id="o-relaxed"> Relaxed mode (no damage)</label>
   <label><input type="checkbox" id="o-shadows"> Shadows (turn off if laggy)</label>
   <label><input type="checkbox" id="o-sound"> Sound</label>
+  <h3>📅 Daily missions</h3><ul id="missions"></ul>
   <h3>🏆 Best intercepts</h3><ol id="board"></ol>
-  <small>PC: WASD drive · Shift boost · Space brake · E probe · F anchor · C photo · Z binoculars · H horn · M map</small>
+  <small id="records"></small>
+  <small>PC: WASD drive · Shift boost · Space brake · E probe · Q probe type · F anchor · C photo · V video · Z binoculars · H horn · M map</small>
   <button id="o-close">RESUME</button><button id="o-reset" style="background:#d9262b">RESET PROGRESS</button>
 </div></div>
 <div id="shop" class="overlay hidden"><div class="card">
   <h2>🚗 Dealership · <span id="shop-money"></span></h2>
   <h3>Vehicles</h3><div id="vlist"></div>
-  <h3>Upgrades</h3><div id="ulist"></div>
+  <h3>🎨 Customise your current vehicle</h3><div id="custom"></div>
+  <h3>🔧 Upgrades</h3><div id="ulist"></div>
+  <h3>🎒 Probes &amp; gear</h3><div id="glist"></div>
   <button id="shop-close">LEAVE</button>
+</div></div>
+<div id="rate" class="overlay hidden"><div class="card">
+  <h2>📋 Damage survey</h2>
+  <p>Look at the damage around the flag. What EF rating was this tornado? Right answer pays the most.</p>
+  <div id="rate-btns"></div>
 </div></div>
 <div id="start" class="overlay"><div class="card">
   <h1>TORNADION</h1>
   <p>Chase supercells across the plains in the <b>Dionado</b>.</p>
-  <small>Left thumb: drive · BOOST: jet · PROBE: drop a weather balloon in the tornado's path (tap again near it to pick up) · ANCHOR: spikes + shutters so you don't get flung · PHOTO / ZOOM: binocular photos · Tap the radar for the big map · Orange flags after a tornado = damage surveys · Refuel + restock probes at ⛽, repair at 🔧, buy vehicles at 🚗</small>
+  <small>Left thumb: drive · BOOST: jet · PROBE: deploy the selected probe (🔁 switches type, tap again near a probe to pick it up) · ANCHOR: spikes + shutters so you don't get flung · PHOTO / ZOOM: binocular photos · Tap the radar for the big map · Orange flags after a tornado = damage surveys · Yellow ◆ = people to rescue · Daily missions in ☰ · Refuel + restock probes at ⛽, repair at 🔧, buy vehicles at 🚗</small>
   <button>TAP TO START</button>
 </div></div>
 <script type="module" src="./src/main.js"></script>

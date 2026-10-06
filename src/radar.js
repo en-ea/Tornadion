@@ -23,7 +23,7 @@ export function createRadar(world, weather) {
   cv.addEventListener('pointerdown', e => { e.stopPropagation(); big = !big; cv.classList.toggle('big', big); });
   const ECHO = [[0.9, '224,64,251'], [0.7, '255,59,48'], [0.45, '255,214,10'], [0, '52,199,89']];
 
-  function draw(car, { probes = [], surveys = [], range = 450 } = {}) {
+  function draw(car, { probes = [], surveys = [], rescues = [], range = 450 } = {}) {
     const dpr = Math.min(devicePixelRatio, 2), W = Math.round(cv.clientWidth * dpr);
     if (!W) return;
     if (cv.width !== W) cv.width = cv.height = W;
@@ -63,7 +63,9 @@ export function createRadar(world, weather) {
     }
     // Surveys and probes
     for (const s of surveys) { ctx.fillStyle = '#ff9f1a'; ctx.fillRect(X(s.x) - 4 * dpr, Y(s.z) - 4 * dpr, 8 * dpr, 8 * dpr); }
-    for (const p of probes) if (p.state === 'armed') { ctx.fillStyle = '#3ff'; ctx.beginPath(); ctx.arc(X(p.pos.x), Y(p.pos.z), 4 * dpr, 0, 7); ctx.fill(); }
+    for (const p of probes) if (p.state !== 'hit') { ctx.fillStyle = p.state === 'armed' ? '#3ff' : '#fff'; ctx.beginPath(); ctx.arc(X(p.pos.x), Y(p.pos.z), (p.state === 'armed' ? 4 : 3) * dpr, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#ffd21a';
+    for (const r of rescues) { const x = X(r.x), y = Y(r.z), k = 6 * dpr; ctx.beginPath(); ctx.moveTo(x, y - k); ctx.lineTo(x + k, y); ctx.lineTo(x, y + k); ctx.lineTo(x - k, y); ctx.fill(); }
     // Tornadoes: past track, projected path, icon
     for (const t of weather.tornadoes) {
       ctx.lineWidth = 2 * dpr; ctx.strokeStyle = 'rgba(255,70,70,.9)';

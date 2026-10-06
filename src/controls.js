@@ -59,10 +59,12 @@ export function createControls() {
   tap('b-anchor', 'anchor');
   tap('b-photo', 'photo');
   tap('b-zoom', 'zoom');
+  tap('b-ptype', 'ptype');
+  tap('b-rec', 'rec');
   addEventListener('contextmenu', e => e.preventDefault());
 
   const keys = new Set();
-  const TAPKEYS = { KeyE: 'probe', KeyF: 'anchor', KeyC: 'photo', KeyZ: 'zoom', KeyM: 'map' };
+  const TAPKEYS = { KeyE: 'probe', KeyF: 'anchor', KeyC: 'photo', KeyZ: 'zoom', KeyM: 'map', KeyQ: 'ptype', KeyV: 'rec' };
   addEventListener('keydown', e => {
     keys.add(e.code);
     if (!e.repeat && TAPKEYS[e.code]) input.taps.add(TAPKEYS[e.code]);
