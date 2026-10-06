@@ -8,6 +8,12 @@ import { VEHICLES } from './vehicles.js';
 const PREFIX = 'tornadion-v1-';
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const COLORS = ['#ff8a1f', '#2fd3c4', '#ff5fae', '#ffd21a'];
+// STUN finds a direct route; the TURN relays are the fallback when home routers or mobile data block direct connections.
+const PEER_OPTS = { debug: 1, config: { iceServers: [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+] } };
 
 function nameSprite(name, color) {
   const c = document.createElement('canvas');
@@ -40,16 +46,26 @@ export function createCoop(G) {
     G.toast(`👥 ${p.name} left`);
     changed();
   }
+  function player(id, name, conn) {
+    let p = players.get(id);
+    if (!p) {
+      p = { name, color: COLORS[colorN++ % COLORS.length], conn };
+      players.set(id, p);
+      G.toast(`👥 ${name} joined the chase`);
+      G.unlock('coop');
+      changed();
+    }
+    return p;
+  }
   function onMsg(conn, m) {
+    if (m.t === 'hello') {
+      const p = player(m.id, m.n, conn);
+      if (p.name !== m.n) { p.name = m.n; changed(); }
+      if (role === 'host') { broadcast(m, conn); conn.send({ t: 'hello', id: myId, n: S.playerName }); for (const [id, q] of players) if (id !== m.id) conn.send({ t: 'hello', id, n: q.name }); }
+      return;
+    }
     if (m.t === 'car') {
-      let p = players.get(m.id);
-      if (!p) {
-        p = { name: m.n, color: COLORS[colorN++ % COLORS.length] };
-        players.set(m.id, p);
-        G.toast(`👥 ${m.n} joined the chase`);
-        G.unlock('coop');
-        changed();
-      }
+      const p = player(m.id, m.n, conn);
       if (!p.ghost || p.veh !== m.v || p.paint !== m.p || p.name !== m.n) {
         if (p.ghost) scene.remove(p.ghost);
         p.ghost = vehicleModel(VEHICLES.find(v => v.id === m.v) || VEHICLES[0], { paint: m.p });
@@ -65,12 +81,22 @@ export function createCoop(G) {
     } else if (m.t === 'wx' && role === 'guest') weather.applySnapshot(m.s);
     else if (m.t === 'bye') removePlayer(m.id);
   }
+  let joinTimer = 0;
   function setup(c) {
     c.on('open', () => {
       conns.push(c);
+      clearTimeout(joinTimer);
+      c.send({ t: 'hello', id: myId, n: S.playerName });
       if (role === 'guest') { status = `Connected to game ${code}`; weather.remote = true; G.toast(`👥 Joined game ${code}! Storms now come from the host.`); }
       changed();
     });
+    c.on('error', e => { if (role === 'guest') { const msg = `Couldn't connect (${e.type || 'network'}). Try again, or try both on the same Wi-Fi.`; leave(); status = msg; changed(); } });
+    // Show what the connection is doing so it never just sits on "Connecting…".
+    setTimeout(() => c.peerConnection?.addEventListener('iceconnectionstatechange', () => {
+      const st = c.peerConnection.iceConnectionState;
+      if (role === 'guest' && !c.open && st === 'checking') { status = 'Found the game, linking up…'; changed(); }
+      if (role === 'guest' && st === 'failed') { leave(); status = 'Connection blocked by the network. Try both devices on the same Wi-Fi, or switch the phone to mobile data.'; changed(); }
+    }), 0);
     c.on('data', m => onMsg(c, m));
     c.on('close', () => {
       conns = conns.filter(x => x !== c);
@@ -83,7 +109,7 @@ export function createCoop(G) {
     leave();
     role = 'host'; status = 'Starting…';
     code = Array.from({ length: 4 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('');
-    peer = new Peer(PREFIX + code);
+    peer = new Peer(PREFIX + code, PEER_OPTS);
     peer.on('open', id => { myId = id; status = 'Hosting: waiting for friends'; changed(); });
     peer.on('connection', c => { if (conns.length >= 3) c.on('open', () => c.close()); else setup(c); });
     peer.on('error', e => { if (e.type === 'unavailable-id') return host(); status = `Problem: ${e.type}`; changed(); });
@@ -94,9 +120,13 @@ export function createCoop(G) {
     c = (c || '').toUpperCase().replace(/[^A-Z]/g, '');
     if (c.length !== 4) { status = 'Codes are 4 letters'; changed(); return; }
     leave();
-    role = 'guest'; code = c; status = 'Connecting…';
-    peer = new Peer();
-    peer.on('open', id => { myId = id; setup(peer.connect(PREFIX + code, { serialization: 'json', reliable: true })); });
+    role = 'guest'; code = c; status = 'Contacting the game server…';
+    peer = new Peer(PEER_OPTS);
+    peer.on('open', id => {
+      myId = id; status = `Looking for game ${code}…`; changed();
+      setup(peer.connect(PREFIX + code, { reliable: true }));
+      joinTimer = setTimeout(() => { if (role === 'guest' && !conns.length) { leave(); status = 'Timed out. Check the code, make sure the host is still hosting, then try again.'; changed(); } }, 20000);
+    });
     peer.on('error', e => {
       const msg = e.type === 'peer-unavailable' ? `No game found with code ${code}` : `Problem: ${e.type}`;
       leave(); status = msg; changed();
@@ -104,6 +134,7 @@ export function createCoop(G) {
     changed();
   }
   function leave() {
+    clearTimeout(joinTimer);
     if (myId) broadcast({ t: 'bye', id: myId });
     for (const c of conns) c.close();
     peer?.destroy();
@@ -138,7 +169,7 @@ export function createCoop(G) {
     host, join, leave, update,
     set onChange(f) { onChange = f; },
     get role() { return role; }, get code() { return code; }, get status() { return status; },
-    get players() { return [...players.values()].filter(p => p.ghost); },
+    get players() { return [...players.values()]; },
     friends: () => [...players.values()].filter(p => p.ghost).map(p => ({ x: p.ghost.position.x, z: p.ghost.position.z, h: p.ghost.rotation.y, name: p.name, color: p.color })),
     nearFriend: () => [...players.values()].some(p => p.ghost && Math.hypot(p.ghost.position.x - car.pos.x, p.ghost.position.z - car.pos.z) < 300),
   };

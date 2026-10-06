@@ -55,6 +55,7 @@ void main() {
   a *= smoothstep(1.0 - uForm - 0.04, 1.0 - uForm + 0.08, vY);
   a *= 1.0 - smoothstep(0.92, 1.0, vY) * 0.5;
   gl_FragColor = vec4(col, a);
+  #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>
 }`;

@@ -13,6 +13,8 @@ import { createJobs } from './jobs.js';
 import { createProgress } from './progress.js';
 import { createCoop } from './coop.js';
 import { createUI } from './ui.js';
+import { createGrass } from './grass.js';
+import { vehicleThumb } from './thumbs.js';
 
 const $ = id => document.getElementById(id);
 const touch = matchMedia('(pointer: coarse)').matches;
@@ -56,6 +58,8 @@ function resetSave() { wiping = true; try { localStorage.removeItem(SAVE_KEY); }
 // ---------- renderer & world ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: !touch, powerPreference: 'high-performance', preserveDrawingBuffer: false });
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xcde9f7, 200, 1500);
 const camera = new THREE.PerspectiveCamera(65, 1, 0.8, 4000);
@@ -65,12 +69,14 @@ const car = createCar(scene);
 const weather = createWeather(scene, world, audio);
 const debris = createDebris(scene, world, weather);
 weather.debris = debris;
+const grass = createGrass(scene, world);
 const controls = createControls();
 car.reset(-3.5, -40, 0);
 
 function applyGraphics() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, { low: 0.75, medium: touch ? 1.1 : 1.25, high: touch ? 1.5 : 2 }[S.quality] || 1));
   renderer.shadowMap.enabled = S.shadows && S.quality !== 'low';
+  grass.visible = S.quality !== 'low';
   scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
   resize();
 }
@@ -173,7 +179,8 @@ const G = {
   stat: (id, n) => { jobs.stat(id, n); progress.onStat(id); },
   note: (t, key, amt) => progress.note(t, key, amt),
   unlock: id => progress.unlock(id),
-  probeMult: () => (car.perk === 'radar' ? 1.25 : 1),
+  probeMult: () => (car.perk === 'radar' ? 1.25 : car.perk === 'science' ? 1.4 : 1),
+  vehicleThumb,
   record(t, d, pay) { S.best.push({ r: t.rating, d: Math.round(d), pay: Math.round(pay), s: t.special ? 'mutant' : t.kind === 'devil' ? 'dust devil' : t.shape }); S.best.sort((a, b) => b.pay - a.pay); S.best.length = Math.min(S.best.length, 10); },
   setIndicator(txt) { if ($('live').textContent !== txt) { $('live').textContent = txt; $('live').style.display = txt ? 'block' : 'none'; } },
   setPaused(v) { S.paused = v || S.mode === 'title' || !!ui?.open; last = performance.now(); },
@@ -325,7 +332,7 @@ function frame(now) {
   coop.update(dt);
   if (S.paused) {
     controls.input.taps.clear();
-    if (S.mode === 'title' && !ui.open) { weather.update(dt, car, camera); world.update(dt, weather.clock, car.pos); updateCamera(dt); }
+    if (S.mode === 'title' && !ui.open) { weather.update(dt, car, camera); world.update(dt, weather.clock, car.pos); grass.update(dt, car.pos, 5); updateCamera(dt); }
     renderer.render(scene, camera);
     return;
   }
@@ -347,6 +354,7 @@ function frame(now) {
   weather.update(dt, car, camera);
   debris.update(dt, car, () => audio.crash(0.4));
   world.update(dt, weather.clock, car.pos);
+  grass.update(dt, car.pos, car.wind.speed);
   probes.update(dt);
   updateSurveys();
   jobs.update(dt);
@@ -398,5 +406,6 @@ function frame(now) {
 }
 
 ui.showTitle();
+requestAnimationFrame(() => requestAnimationFrame(() => { $('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 600); }));
 if (location.search.includes('autostart')) ui.startGame(false);
 requestAnimationFrame(frame);

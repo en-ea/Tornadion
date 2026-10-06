@@ -6,7 +6,7 @@ const fmt = n => '$' + Math.round(n).toLocaleString();
 const hex = c => '#' + c.toString(16).padStart(6, '0');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const ago = t => { const s = Math.round((Date.now() - t) / 1000); return s < 5 ? 'just now' : s < 90 ? `${s}s ago` : `${Math.round(s / 60)} min ago`; };
-const PERK = { heal: '🩹 Repairs itself', radar: '📡 Long-range radar · +25% probe pay', camera: '🎥 Photos pay ×1.5' };
+const PERK = { heal: '🩹 Repairs itself · rescues pay ×2', radar: '📡 Long-range radar · +25% probe pay', camera: '🎥 Photos pay ×1.5', science: '🔬 +40% probe data pay' };
 const EF_DESC = ['65-85 mph · branches broken, shingles off', '86-110 mph · roofs peeled, mobile homes pushed', '111-135 mph · roofs torn off, big trees snapped', '136-165 mph · walls collapse, cars lifted', '166-200 mph · houses levelled, cars thrown', '200+ mph · strong buildings swept clean'];
 
 const TUTORIAL = [
@@ -91,7 +91,8 @@ export function createUI(G) {
       ${toggle('shadows', 'Shadows', S.shadows)}
       <h4>Gameplay</h4>
       ${toggle('relaxed', 'Relaxed mode', S.relaxed, 'Your vehicle takes no damage')}
-      <div class="set"><span>Tutorial<small>Shows the basics again</small></span><button data-act="tutorial">Play tutorial</button></div>`],
+      <div class="set"><span>Tutorial<small>Shows the basics again</small></span><button data-act="tutorial">Play tutorial</button></div>
+      <div class="set"><span>Full screen<small>Tip: add Tornadion to your home screen to always open full screen</small></span><button data-act="fullscreen">${document.fullscreenElement ? 'Exit full screen' : 'Go full screen'}</button></div>`],
     save: ['💾 Save', () => `
       <p>Progress saves automatically on this device every few seconds${S.savedAt ? ` · last save <b>${ago(S.savedAt)}</b>` : ''}.</p>
       <button data-act="saveNow" class="primary">💾 Save now</button>
@@ -133,18 +134,18 @@ export function createUI(G) {
 
   // ---------- dealership ----------
   const SHOP = [
-    { id: 'veh', label: '🚗 Vehicles', render: () => `<p class="muted">Buy a vehicle once, then swap between your vehicles here any time.</p><div class="vgrid">` + VEHICLES.map(v => {
+    { id: 'veh', label: '🚗 Vehicles', render: () => `<p class="muted">Buy a vehicle once, then swap between your vehicles here any time.</p><div class="vgrid">` + VEHICLES.slice().sort((a, b) => a.price - b.price).map(v => {
       const own = S.owned.includes(v.id), cur = v.id === S.vehicle, afford = S.money >= v.price;
       const tags = [v.anchor && '⚓ Anchor', v.jet && '🔥 Jet booster', v.hailproof && '🧊 Hail-proof', PERK[v.perk]].filter(Boolean);
       const btn = cur ? '<button disabled class="cur">✔ Driving</button>' : own ? `<button data-act="drive" data-v="${v.id}" class="primary">Drive this</button>`
         : `<button data-act="buy" data-v="${v.id}" class="buy" ${afford ? '' : 'disabled'}>${afford ? 'Buy' : '🔒'} ${fmt(v.price)}</button>`;
-      return `<div class="vcard${cur ? ' cur' : ''}"><div class="vtop"><b>${esc((own && S.cust[v.id]?.name) || v.name)}</b>${own ? '<span class="pill">OWNED</span>' : ''}</div><small>${v.desc}</small>
+      return `<div class="vcard${cur ? ' cur' : ''}"><img class="vimg" alt="" src="${G.vehicleThumb(v, own ? S.cust[v.id] || {} : {})}"><div class="vtop"><b>${esc((own && S.cust[v.id]?.name) || v.name)}</b>${own ? '<span class="pill">OWNED</span>' : ''}</div><small>${v.desc}</small>
         ${statBar('Speed', v.top / 40)}${statBar('Toughness', v.hp * v.armor / 1240)}${statBar('Weight (resists wind)', v.mass / 3.8)}${statBar(`Probes (${v.probes})`, v.probes / 6)}
         <div class="tags">${tags.map(t => `<span>${t}</span>`).join('')}</div>${btn}</div>`;
     }).join('') + '</div>' },
     { id: 'cust', label: '🎨 Customise', render: () => {
       const c = G.cust(), v = G.vdef();
-      return `<p class="muted">Customising <b>${esc(G.vname())}</b> (the vehicle you're driving). It's free.</p>
+      return `<div class="cust-top"><img class="vimg" alt="" src="${G.vehicleThumb(v, c)}"><p class="muted">Customising <b>${esc(G.vname())}</b>, the vehicle you're driving. Customising is free. Decals and the light bar show on the vehicle itself.</p></div>
         <h4>Name</h4><input id="c-name" maxlength="20" placeholder="${esc(v.name)}" value="${esc(c.name || '')}" data-change="cname">
         <h4>Paint</h4><div class="swatches">${PAINTS.map(p => `<button data-act="paint" data-v="${p}" class="swatch${(c.paint ?? null) === p ? ' on' : ''}" style="background:${p == null ? 'linear-gradient(135deg,#e8e8e8 50%,#777 50%)' : hex(p)}" title="${p == null ? 'Factory colours' : ''}"></button>`).join('')}</div>
         <small class="muted">The first swatch puts the factory colours back.</small>
@@ -174,6 +175,7 @@ export function createUI(G) {
     quit: () => { closeModal(); showTitle(); },
     tutorial: () => { closeModal(); startGame(true); },
     quality: d => { S.quality = d.v; G.applyGraphics(); },
+    fullscreen: () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => G.toast('Full screen is not supported here. Use Add to Home Screen instead.')); setTimeout(render, 300); },
     saveNow: () => { G.persist(); G.toast('💾 Game saved'); },
     download: () => {
       const a = document.createElement('a');
@@ -232,6 +234,11 @@ export function createUI(G) {
     $('t-sub').textContent = fresh ? 'Chase supercells. Probe tornadoes. Get rich (or flung).' : `${fmt(S.money)} · Level ${G.level()} · ${VEHICLES.filter(v => S.owned.includes(v.id)).length} vehicle(s)`;
   }
   function startGame(withTutorial) {
+    // On phones, go full screen (and lock landscape where supported) when play starts.
+    const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone;
+    if (matchMedia('(pointer: coarse)').matches && !standalone && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+    }
     S.mode = 'play'; S.started = true;
     $('title').classList.add('hidden');
     $('hud').classList.remove('hidden');

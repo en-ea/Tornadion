@@ -18,11 +18,11 @@ function lower({ L, wb, ar = 0.74, ay = 0.6, bot = 0.5, noseY = 1.15, hoodY = 1.
   s.lineTo(-h + 0.1, beltY); s.lineTo(-h, beltY - 0.2); s.lineTo(-h, bot + 0.12);
   return s;
 }
-function lights(L, y, ty = y + 0.05, extra) {
+function lights(L, y, ty = y + 0.05, extra, hx = 0.66) {
   const k = new Kit(), h = L / 2;
   for (const s of [-1, 1]) {
-    k.add(box(0.44, 0.22, 0.06), 0xfff9b3, s * 0.66, y, h + 0.03, 0, 0, 0, 0);
-    k.add(box(0.28, 0.3, 0.06), 0xff2a2a, s * 0.8, ty, -h - 0.03, 0, 0, 0, 0);
+    k.add(box(0.44, 0.22, 0.06), 0xfff9b3, s * hx, y, h + 0.03, 0, 0, 0, 0);
+    k.add(box(0.28, 0.3, 0.06), 0xff2a2a, s * (hx + 0.14), ty, -h - 0.03, 0, 0, 0, 0);
   }
   extra?.(k);
   return k.geometry();
@@ -119,13 +119,95 @@ function tiv(C, A, turret) {
   return { body: k.geometry(), lights: lights(5.8, 1.05, 1.3) };
 }
 
+function zafiro() { // small cheap hatchback
+  const k = new Kit(), C = 0x3a8fb7, T = 0x2a2a2e;
+  k.add(extrude(lower({ L: 4.2, wb: 1.3, ar: 0.6, ay: 0.5, bot: 0.38, noseY: 0.9, hoodY: 1.08, hoodEnd: 0.85, beltY: 1.2 }), 1.8), C, 0, 0, 0, 0, 0, 0, 0.03);
+  k.add(extrude(poly([[0.85, 1.07], [0.15, 1.78], [-1.55, 1.8], [-1.98, 1.2]]), 1.64, 0.05), 0x2c4560);
+  k.add(box(1.72, 0.08, 1.72), C, 0, 1.84, -0.7);
+  for (const s of [-1, 1]) {
+    k.add(box(0.07, 0.62, 0.12), C, s * 0.82, 1.48, -0.55);
+    k.add(box(0.06, 0.1, 3.2), T, s * 0.94, 0.6, 0);
+    k.add(box(0.1, 0.12, 0.22), C, s * 0.98, 1.28, 0.75);
+  }
+  for (const z of [2.08, -2.08]) k.add(box(1.86, 0.24, 0.18), T, 0, 0.55, z);
+  k.add(box(0.8, 0.18, 0.05), T, 0, 0.82, 2.1);
+  return { body: k.geometry(), lights: lights(4.2, 0.86, 0.98, null, 0.58) };
+}
+function buffalo() { // 2017 Bullhorn Buffalo 3500 crew cab
+  const k = new Kit(), C = 0x9c1b1f, T = 0x1e1e22, CH = 0xc8cacf;
+  k.add(extrude(lower({ L: 6.2, wb: 2.0, ar: 0.8, ay: 0.7, bot: 0.5, noseY: 1.35, hoodY: 1.62, hoodEnd: 1.2, beltY: 1.62 }), 2.15), C, 0, 0, 0, 0, 0, 0, 0.03);
+  k.add(extrude(poly([[1.2, 1.6], [0.55, 2.36], [-1.15, 2.38], [-1.25, 1.62]]), 1.98, 0.05), 0x2c3e55);
+  k.add(box(2.04, 0.1, 1.75), C, 0, 2.43, -0.3);
+  for (const s of [-1, 1]) {
+    k.add(box(0.08, 0.7, 0.12), C, s * 0.98, 2.0, -0.3);
+    k.add(box(0.12, 0.52, 1.85), C, s * 1.02, 1.88, -2.17);
+    k.add(box(0.28, 0.06, 2.6), T, s * 1.18, 0.62, 0);
+    k.add(box(0.1, 0.38, 0.32), T, s * 1.2, 1.95, 1.0);
+  }
+  k.add(box(2.12, 0.52, 0.1), C, 0, 1.88, -3.08);
+  k.add(box(1.92, 0.05, 1.8), 0x2a2a2a, 0, 1.64, -2.17);
+  k.add(box(1.2, 0.62, 0.08), CH, 0, 1.12, 3.1); k.add(box(1.0, 0.44, 0.09), T, 0, 1.12, 3.12);
+  k.add(box(0.5, 0.12, 0.1), CH, 0, 1.12, 3.15);
+  for (const z of [3.12, -3.12]) k.add(box(2.24, 0.32, 0.3), CH, 0, 0.7, z);
+  flares(k, 2.0, 0.8, 0.7, T, 1.12);
+  return { body: k.geometry(), lights: lights(6.2, 1.25, 1.6, null, 0.78) };
+}
+function van() { // white chase van with roof strobes and weather gear
+  const k = new Kit(), W = 0xf2f2f2, O = 0xff8a1f, G = 0x2c3e55;
+  k.add(extrude(lower({ L: 5.6, wb: 1.85, ar: 0.7, ay: 0.62, bot: 0.45, noseY: 1.2, hoodY: 1.45, hoodEnd: 1.75, beltY: 1.45 }), 2.05), W, 0, 0, 0, 0, 0, 0, 0.03);
+  k.add(box(2.05, 1.36, 4.25), W, 0, 2.12, -0.67);
+  k.add(extrude(poly([[1.78, 1.44], [1.44, 2.78], [1.42, 2.78], [1.42, 1.44]]), 1.9, 0.04), G);
+  for (const s of [-1, 1]) {
+    k.add(box(0.04, 0.5, 1.0), G, s * 1.04, 2.3, 0.85);
+    k.add(box(0.04, 0.5, 2.2), G, s * 1.04, 2.3, -1.15);
+    k.add(box(0.05, 0.22, 5.5), O, s * 1.04, 1.32, 0);
+    k.add(box(0.05, 0.08, 5.5), 0x1f5fd9, s * 1.04, 1.16, 0);
+    k.add(box(0.06, 0.08, 3.6), 0x2a2a2e, s * 0.8, 2.86, -0.7);
+  }
+  for (const z of [0.6, -2.0]) k.add(box(1.7, 0.06, 0.08), 0x2a2a2e, 0, 2.9, z);
+  k.add(box(1.7, 0.14, 0.32), 0x1b1b1f, 0, 2.92, 1.1);
+  k.add(new THREE.SphereGeometry(0.4, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2), 0xf4f4f4, -0.4, 2.85, -1.0);
+  k.add(cyl(0.04, 0.04, 1.3, 5), 0x9aa0a8, 0.55, 3.5, -2.3);
+  k.add(box(0.9, 0.04, 0.04), 0x9aa0a8, 0.55, 4.15, -2.3);
+  for (const z of [2.82, -2.82]) k.add(box(2.1, 0.24, 0.24), 0x8a8a90, 0, 0.62, z);
+  flares(k, 1.85, 0.7, 0.62, 0x3a3a3a, 1.04);
+  return { body: k.geometry(), lights: lights(5.6, 1.05, 1.5, k2 => { for (let i = 0; i < 6; i++) k2.add(box(0.2, 0.1, 0.1), i % 2 ? 0xffa51f : 0xffffff, -0.6 + i * 0.24, 3.01, 1.22, 0, 0, 0, 0); }) };
+}
+function srv() { // armoured Storm Research Vehicle
+  const k = new Kit(), Y = 0xf2b50f, D = 0x24262b, W = 0xe8e8e8;
+  k.add(extrude(lower({ L: 6.4, wb: 2.1, ar: 0.82, ay: 0.72, bot: 0.5, noseY: 1.35, hoodY: 1.62, hoodEnd: 1.7, beltY: 1.62 }), 2.3), Y, 0, 0, 0, 0, 0, 0, 0.04);
+  k.add(extrude(poly([[1.72, 1.62], [1.0, 2.72], [-0.05, 2.76], [-0.05, 1.62]]), 2.2, 0.06), Y, 0, 0, 0, 0, 0, 0, 0.04);
+  k.add(box(1.7, 0.3, 0.06), 0x2c3e55, 0, 2.25, 1.39, -0.58);
+  k.add(box(2.3, 1.5, 3.15), W, 0, 2.35, -1.62);
+  for (const s of [-1, 1]) {
+    k.add(box(0.12, 0.62, 5.8), D, s * 1.22, 1.0, 0);
+    for (let z = -2.4; z <= 2.4; z += 1.2) k.add(box(0.14, 0.62, 0.3), Y, s * 1.23, 1.0, z);
+    k.add(box(0.05, 0.4, 1.4), 0x2c3e55, s * 1.16, 2.5, -1.4);
+    k.add(box(0.06, 0.18, 3.1), Y, s * 1.16, 2.0, -1.62);
+  }
+  k.add(box(2.1, 0.08, 2.9), D, 0, 3.15, -1.6);
+  k.add(new THREE.SphereGeometry(0.62, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2), 0xf4f4f4, 0.3, 3.18, -0.85);
+  k.add(cyl(0.06, 0.06, 2.1, 5), 0x9aa0a8, -0.6, 4.2, -2.6);
+  k.add(box(1.3, 0.05, 0.05), 0x9aa0a8, -0.6, 5.2, -2.6);
+  for (let i = 0; i < 3; i++) k.add(cyl(0.02, 0.02, 0.8, 3), 0x222222, 0.6 - i * 0.25, 3.6, -2.7);
+  k.add(box(2.5, 0.5, 0.25), D, 0, 0.92, 3.28);
+  for (const x of [-0.7, 0, 0.7]) k.add(box(0.1, 0.7, 0.1), D, x, 1.2, 3.38);
+  k.add(box(2.3, 0.3, 0.3), D, 0, 0.75, -3.2);
+  flares(k, 2.1, 0.82, 0.72, D, 1.18);
+  return { body: k.geometry(), lights: lights(6.4, 1.2, 1.45, k2 => k2.add(cyl(0.14, 0.14, 0.18, 8), 0xffa51f, 0, 2.86, 0.4, 0, 0, 0, 0), 0.75) };
+}
+
 export const VEHICLES = [
   { id: 'dionado', paint: [0x1700eb, 0x3220a7], bar: [2.64, 0.05], name: 'Dionado (custom)', price: 0, hp: 140, mass: 1.25, armor: 1.3, top: 34, probes: 3, fuel: 100, jet: true, anchor: true, len: 4.9, desc: 'Your SUV: armour plates, jet booster, anchor spikes, metal shutters' },
+  { id: 'zafiro', paint: [0x3a8fb7], bar: [1.92, -0.6], name: 'Chevron Zafiro', price: 1500, hp: 85, mass: 0.85, armor: 0.9, top: 38, probes: 2, fuel: 70, len: 4.2, wb: 1.3, wr: 0.5, track: 0.92, build: zafiro, desc: 'Cheap and nippy, but the wind loves it' },
   { id: 'chevron', paint: [0xc0282d], bar: [2.16, -0.2], name: '1992 Chevron 454 SS', price: 3500, hp: 100, mass: 1.0, armor: 1.0, top: 40, probes: 2, fuel: 90, len: 5.3, wb: 1.65, build: pickup, desc: 'Fast, light, easy to fling' },
   { id: 'sumo', paint: [0x2f6b3a, 0x264f2e], bar: [2.47, -0.4], name: '2018 Sumo Woodlands XT', price: 8000, hp: 130, mass: 1.3, armor: 1.1, top: 36, probes: 3, fuel: 110, len: 4.9, build: suv, desc: 'Solid all-rounder' },
+  { id: 'van', paint: [0xf2f2f2], bar: [2.98, 0.2], name: 'Chase Van', price: 12000, hp: 150, mass: 1.5, armor: 1.1, top: 34, probes: 6, fuel: 130, len: 5.6, wb: 1.85, build: van, desc: 'Mobile chase base: roof strobes and room for 6 probes' },
   { id: 'ambulance', paint: [0xf4f4f4], bar: [3.27, 0.4], name: '2015 F350 Ambulance', price: 14000, hp: 180, mass: 1.6, armor: 1.2, top: 33, probes: 3, fuel: 130, len: 6.2, wb: 2.0, wr: 0.55, build: ambulance, perk: 'heal', desc: 'EMS: slowly repairs itself' },
+  { id: 'buffalo', paint: [0x9c1b1f], bar: [2.52, -0.3], name: '2017 Bullhorn Buffalo 3500', price: 22000, hp: 200, mass: 2.2, armor: 1.4, top: 37, probes: 4, fuel: 150, len: 6.2, wb: 2.0, wr: 0.7, track: 1.12, build: buffalo, desc: 'Heavy-duty crew cab: tough, heavy and quick on the highway' },
   { id: 'dow', paint: [0xf2f2f2], bar: [2.55, 0.75], name: 'DOW Doppler on Wheels', price: 28000, hp: 170, mass: 2.0, armor: 1.3, top: 31, probes: 4, fuel: 140, anchor: true, len: 6.4, wb: 2.1, build: dow, perk: 'radar', desc: 'Long-range radar, +25% probe pay' },
   { id: 'dom1', paint: [0x2b2b2b], bar: [2.56, 0.15], name: 'Dominator 1', price: 40000, hp: 220, mass: 2.1, armor: 1.8, top: 33, probes: 4, fuel: 140, anchor: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, build: () => dominator(0x2b2b2b, 0xff8a1f, 1), desc: 'Armoured interceptor' },
+  { id: 'srv', paint: [0xf2b50f], bar: [3.25, 0.2], name: 'SRV (Storm Research Vehicle)', price: 50000, hp: 250, mass: 2.5, armor: 2.0, top: 32, probes: 5, fuel: 170, anchor: true, hailproof: true, len: 6.4, wb: 2.1, wr: 0.72, track: 1.18, build: srv, perk: 'science', desc: 'Armoured science truck: anchors, hail-proof glass, +40% pay for probe data' },
   { id: 'dom2', paint: [0x5a6068], bar: [2.56, 0.15], name: 'Dominator 2', price: 65000, hp: 260, mass: 2.4, armor: 2.1, top: 35, probes: 5, fuel: 150, anchor: true, hailproof: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, build: () => dominator(0x5a6068, 0xd9362b, 2), desc: 'Heavier, hail-proof glass' },
   { id: 'dom3', paint: [0x15151a], bar: [2.56, 0.15], name: 'Dominator 3', price: 100000, hp: 300, mass: 2.8, armor: 2.4, top: 37, probes: 6, fuel: 160, anchor: true, hailproof: true, jet: true, len: 5.6, wb: 1.7, wr: 0.7, track: 1.12, jetY: 1.4, build: () => dominator(0x15151a, 0x2f7dff, 3), desc: 'Top interceptor with jet boost' },
   { id: 'tiv1', paint: [0x4a4f45], bar: [2.15, 1.0], name: 'TIV 1', price: 85000, hp: 330, mass: 3.2, armor: 2.7, top: 27, probes: 4, fuel: 160, anchor: true, hailproof: true, len: 5.8, wb: 1.8, wr: 0.72, track: 1.2, build: () => tiv(0x4a4f45, 0x3a3e36, false), desc: 'Tank. Slow but almost unflingable' },

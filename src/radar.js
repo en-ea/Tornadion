@@ -53,7 +53,7 @@ export function createRadar(world, weather) {
     for (const p of world.places) ctx.fillText({ gas: '⛽', repair: '🔧', dealer: '🚗' }[p.type], X(p.x), Y(p.z));
     for (const ms of world.mesonets) {
       const mph = Math.round(weather.windAt(ms.x, ms.z).speed * 2.237), x = X(ms.x), y = Y(ms.z);
-      if (x < 0 || y < 0 || x > W || y > W) continue;
+      if (x < 0 || y < 0 || x > W || y > W || (!big && mph < 25)) continue;
       ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 11 * dpr, y - 7 * dpr, 22 * dpr, 14 * dpr);
       ctx.fillStyle = mph > 60 ? '#ff6b6b' : '#fff'; ctx.fillText(mph, x, y);
     }

@@ -83,46 +83,112 @@ export function surfaceAt(x, z) {
 
 const C = h => new THREE.Color(h);
 const TC = {
-  verge: C(0x7fb54c), pasture: C(0x8dc455), wheat: C(0xe2c15e), plowed: [C(0x8e5c38), C(0x76492a)],
-  soy: [C(0x5d9b3b), C(0x71b047)], corn: C(0x6e6233), town: C(0x98c96a), highway: C(0x55575e), road: C(0xb8925f),
-  sand: C(0xdccb91), bed: C(0x55756f),
+  verge: C(0x6f9e45), pasture: C(0x7aad48), wheat: C(0xd4b45a), plowed: [C(0x7d553a), C(0x6c4931)],
+  soy: [C(0x568f37), C(0x649f40)], corn: C(0x5f5a30), town: C(0x86b25c), highway: C(0x4a4c52), road: C(0xa88a62),
+  sand: C(0xd2c08c), bed: C(0x4f6b66),
 };
+const DRY = C(0xb4ac62), LUSH = C(0x4f8a35);
 function faceColor(x, z, h, out) {
   if (h < WATER + 0.5) return out.copy(h < WATER - 0.6 ? TC.bed : TC.sand);
-  const c = TC[zoneAt(x, z)];
+  const zone = zoneAt(x, z), c = TC[zone];
   out.copy(Array.isArray(c) ? c[Math.floor(x / 5 + 1000) & 1] : c);
-  return out.multiplyScalar(0.92 + noise(x * 0.03, z * 0.03) * 0.16);
+  // Grass gets patches of dry and lush areas so it never reads as one flat colour.
+  if (zone === 'verge' || zone === 'pasture' || zone === 'town') {
+    const f = fbm(x * 0.011 + 3, z * 0.011 + 9);
+    out.lerp(DRY, smooth(0.5, 0.78, f) * 0.5).lerp(LUSH, smooth(0.42, 0.2, f) * 0.45);
+  }
+  return out.multiplyScalar(0.86 + noise(x * 0.03, z * 0.03) * 0.16 + noise(x * 0.13, z * 0.13) * 0.1);
+}
+// Fine speckled detail texture multiplied over the ground and roads.
+function detailTexture(dark = 200) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgb(236,236,236)'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 5000; i++) {
+    const v = rng() < 0.6 ? dark + rng() * 30 : 245 + rng() * 10;
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.fillRect(rng() * 256, rng() * 256, 1 + rng() * 2, 1 + rng() * 2);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// Rippling water normal map (tiling noise turned into normals).
+function waterNormals() {
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d'), img = g.createImageData(S, S), hgt = (x, y) => noise(x / 16, y / 16) * 0.6 + noise(x / 6 + 30, y / 6) * 0.4;
+  const wrap = v => (v + S) % S;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = hgt(wrap(x + 1), y) - hgt(wrap(x - 1), y), dy = hgt(x, wrap(y + 1)) - hgt(x, wrap(y - 1)), o = (y * S + x) * 4;
+    img.data[o] = 128 - dx * 300; img.data[o + 1] = 128 - dy * 300; img.data[o + 2] = 255; img.data[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
 }
 
 // ---------- reusable low-poly models ----------
 function roundTree() {
   const k = new Kit();
-  k.add(cyl(0.22, 0.32, 2.6, 5), 0x7a5230, 0, 1.3, 0);
-  const c = ico(2.1); c.scale(1, 0.85, 1);
-  k.add(c, 0x4d9a38, 0, 3.9, 0, 0, 0, 0, 0.1);
-  k.add(ico(1.4), 0x5aa843, 0.8, 5, 0.3, 0, 0, 0, 0.1);
-  k.add(ico(1.3), 0x489033, -0.9, 4.4, -0.4, 0, 0, 0, 0.1);
+  k.add(cyl(0.2, 0.34, 3, 6), 0x6b4a2e, 0, 1.5, 0);
+  k.add(cyl(0.09, 0.13, 1.6, 4), 0x6b4a2e, 0.55, 2.9, 0.1, 0, 0, -0.6);
+  k.add(cyl(0.09, 0.13, 1.5, 4), 0x6b4a2e, -0.5, 2.8, -0.2, 0, 0, 0.65);
+  // Clustered canopy: darker blobs underneath, lighter ones on top.
+  for (const [x, y, z, r, c] of [[0, 3.6, 0, 2.0, 0x3b7a2c], [1.1, 3.9, 0.4, 1.4, 0x3f8130], [-1.1, 3.8, -0.3, 1.45, 0x3a772b], [0.2, 4.0, -1.1, 1.3, 0x3d7d2e],
+    [-0.2, 4.0, 1.1, 1.3, 0x417f30], [0.4, 4.9, 0.2, 1.45, 0x4f9438], [-0.6, 4.8, -0.2, 1.2, 0x56993c], [0.1, 5.6, 0, 0.95, 0x62a544]]) {
+    const g = ico(r, 1); g.scale(1, 0.82, 1);
+    k.add(g, c, x, y, z, 0, 0, 0, 0.08);
+  }
   return k.geometry();
 }
 function pineTree() {
   const k = new Kit();
-  k.add(cyl(0.2, 0.28, 1.6, 5), 0x6e4a2c, 0, 0.8, 0);
-  k.add(new THREE.ConeGeometry(2, 2.8, 7), 0x2f7446, 0, 2.8, 0, 0, 0, 0, 0.08);
-  k.add(new THREE.ConeGeometry(1.55, 2.4, 7), 0x327a49, 0, 4.3, 0, 0, 0.4, 0, 0.08);
-  k.add(new THREE.ConeGeometry(1.05, 2, 7), 0x357f4d, 0, 5.6, 0, 0, 0.8, 0, 0.08);
+  k.add(cyl(0.18, 0.28, 2, 6), 0x5e4029, 0, 1, 0);
+  const tiers = [[2.1, 2.2, 1.9, 0x24603a], [1.75, 2.1, 3.1, 0x276640], [1.4, 1.9, 4.2, 0x2b6d44], [1.05, 1.7, 5.2, 0x2f7448], [0.65, 1.5, 6.1, 0x35794c]];
+  tiers.forEach(([r, h, y, c], i) => k.add(new THREE.ConeGeometry(r, h, 9), c, 0, y, 0, 0, i * 0.5, 0, 0.07));
   return k.geometry();
 }
-function houseGeo() {
+const gable = (w, h, d, col, k, y, over = 0.5) => {
+  const s = new THREE.Shape([new THREE.Vector2(-w / 2 - over, -0.15), new THREE.Vector2(w / 2 + over, -0.15), new THREE.Vector2(0, h)]);
+  k.add(new THREE.ExtrudeGeometry(s, { depth: d + over * 2, bevelEnabled: false }), col, 0, y, -d / 2 - over);
+};
+// Window with a white frame, sill and two shutters, on the +z (sign = 1) or -z wall.
+function win(k, x, y, z, sign = 1, shutter = 0x3d5a73) {
+  k.add(box(1.5, 1.3, 0.1), 0xf4f4f0, x, y, z + sign * 0.05);
+  k.add(box(1.2, 1.0, 0.1), 0x5f88ad, x, y, z + sign * 0.09);
+  k.add(box(0.06, 1.0, 0.1), 0xf4f4f0, x, y, z + sign * 0.11);
+  k.add(box(1.7, 0.1, 0.25), 0xf4f4f0, x, y - 0.68, z + sign * 0.12);
+  for (const sx of [-1, 1]) k.add(box(0.42, 1.3, 0.08), shutter, x + sx * 0.98, y, z + sign * 0.06);
+}
+function houseGeo() { // one-storey with a porch
   const k = new Kit();
-  k.add(box(8, 4, 6), 0xffffff, 0, 2, 0);
-  const s = new THREE.Shape([new THREE.Vector2(-4.6, 0), new THREE.Vector2(4.6, 0), new THREE.Vector2(0, 2.6)]);
-  const roof = new THREE.ExtrudeGeometry(s, { depth: 6.8, bevelEnabled: false });
-  k.add(roof, 0x6b5048, 0, 4, -3.4);
-  k.add(box(1.2, 2.1, 0.12), 0x6a4a35, 1.8, 1.05, 3.02);
-  for (const x of [-1.8, 3.2]) k.add(box(1.3, 1.1, 0.12), 0x7ea6c9, x === 3.2 ? -3.2 : x, 2.3, 3.02);
-  k.add(box(1.3, 1.1, 0.12), 0x7ea6c9, 0, 2.3, -3.02);
-  k.add(box(0.7, 1.8, 0.7), 0x9a5a48, 2.4, 5.4, -1);
-  k.add(box(3, 0.3, 1.4), 0xb9b0a3, 1.8, 0.15, 3.6);
+  k.add(box(8.4, 0.5, 6.4), 0x8d877f, 0, 0.25, 0);
+  k.add(box(8, 3.4, 6), 0xffffff, 0, 2.2, 0);
+  for (let i = 0; i < 6; i++) k.add(box(8.04, 0.05, 6.04), 0xe6e2da, 0, 0.9 + i * 0.55, 0);
+  gable(8, 2.5, 6, 0x5b4038, k, 3.9);
+  k.add(box(8.9, 0.18, 0.18), 0xf4f4f0, 0, 3.85, 3.5); k.add(box(8.9, 0.18, 0.18), 0xf4f4f0, 0, 3.85, -3.5);
+  k.add(box(1.4, 2.4, 0.12), 0xf4f4f0, 1.8, 1.7, 3.02); k.add(box(1.1, 2.2, 0.14), 0x7a4a2e, 1.8, 1.6, 3.04);
+  win(k, -1.6, 2.3, 3.0); win(k, -1.6, 2.3, -3.0, -1); win(k, 1.8, 2.3, -3.0, -1);
+  k.add(box(4, 0.3, 2), 0xa89a88, 1.8, 0.5, 4); // porch
+  for (const px of [0.1, 3.5]) k.add(box(0.18, 2.6, 0.18), 0xf4f4f0, px, 1.9, 4.85);
+  k.add(box(4.4, 0.16, 2.3), 0x5b4038, 1.8, 3.25, 4.05, 0.12);
+  k.add(box(0.8, 2, 0.8), 0x9a5544, -2.5, 5.2, -1); k.add(box(1, 0.15, 1), 0x6e3e33, -2.5, 6.25, -1);
+  return k.geometry();
+}
+function house2Geo() { // two-storey farmhouse
+  const k = new Kit();
+  k.add(box(7.4, 0.5, 6.8), 0x8d877f, 0, 0.25, 0);
+  k.add(box(7, 6, 6.4), 0xffffff, 0, 3.5, 0);
+  for (let i = 0; i < 10; i++) k.add(box(7.04, 0.05, 6.44), 0xe6e2da, 0, 1 + i * 0.55, 0);
+  gable(7, 2.8, 6.4, 0x44494f, k, 6.5);
+  for (const x of [-1.8, 1.8]) { win(k, x, 4.9, 3.2, 1, 0x2f3d2a); win(k, x, 4.9, -3.2, -1, 0x2f3d2a); win(k, x === 1.8 ? -1.8 : 1.9, 2.3, -3.2, -1, 0x2f3d2a); }
+  win(k, -1.8, 2.3, 3.2, 1, 0x2f3d2a);
+  k.add(box(1.4, 2.4, 0.12), 0xf4f4f0, 1.6, 1.7, 3.22); k.add(box(1.1, 2.2, 0.14), 0x3d5a73, 1.6, 1.6, 3.24);
+  k.add(box(2.6, 0.14, 1.4), 0x44494f, 1.6, 3.1, 3.8, 0.2);
+  k.add(box(0.8, 2.4, 0.8), 0x9a5544, 2.2, 8.2, 0); k.add(box(1, 0.15, 1), 0x6e3e33, 2.2, 9.45, 0);
   return k.geometry();
 }
 function barnGeo() {
@@ -144,13 +210,18 @@ function siloGeo() {
   for (const y of [3, 7, 11]) k.add(cyl(2.28, 2.28, 0.25, 10), 0x9aa2aa, 0, y, 0);
   return k.geometry();
 }
-function shopGeo() {
+function shopGeo() { // main-street shop with a striped awning
   const k = new Kit();
-  k.add(box(12, 5, 9), 0xffffff, 0, 2.5, 0);
-  k.add(box(12.6, 0.6, 9.6), 0x7a7a80, 0, 5.3, 0);
-  k.add(box(8, 2.2, 0.12), 0x8fc0e0, -1, 1.9, 4.52);
-  k.add(box(1.6, 2.6, 0.12), 0x4a3a30, 4, 1.3, 4.52);
-  k.add(box(12, 0.25, 1.6), 0xd23c3c, 0, 3.5, 5.2);
+  k.add(box(12, 5.4, 9), 0xffffff, 0, 2.7, 0);
+  k.add(box(12.4, 0.8, 9.4), 0xd8d2c6, 0, 5.8, 0);
+  k.add(box(12.2, 0.3, 9.2), 0x8d877f, 0, 0.15, 0);
+  k.add(box(8.4, 2.6, 0.12), 0x2a2f36, -1, 1.9, 4.52);
+  k.add(box(8, 2.3, 0.12), 0x7fb2d6, -1, 1.9, 4.55);
+  for (const x of [-3.5, -1, 1.5]) k.add(box(0.1, 2.3, 0.14), 0x2a2f36, x, 1.9, 4.58);
+  k.add(box(1.6, 2.7, 0.12), 0x2a2f36, 4, 1.35, 4.52); k.add(box(1.3, 2.5, 0.14), 0x7fb2d6, 4, 1.3, 4.54);
+  k.add(box(10, 1, 0.16), 0x2f3a4a, 0, 4.4, 4.56);
+  for (let i = 0; i < 8; i++) k.add(box(1.5, 0.12, 1.9), i % 2 ? 0xf4f4f0 : 0xc23b33, -5.25 + i * 1.5, 3.45, 5.35, 0.35);
+  for (const x of [-4, 4]) win(k, x, 3, -4.5, -1, 0x55606b);
   return k.geometry();
 }
 function rubbleGeo() {
@@ -165,15 +236,20 @@ function fenceGeo() {
   k.add(box(0.18, 1.3, 0.18), 0x7d5c3c, -3.5, 0.65, 0);
   return k.geometry();
 }
-function carGeo() {
-  const k = new Kit();
-  k.add(box(2, 0.75, 4.6), 0xffffff, 0, 0.82, 0);
-  k.add(box(1.9, 0.35, 1.9), 0xffffff, 0, 1.36, 0.4);
-  k.add(box(1.86, 0.45, 1.8), 0x28323f, 0, 1.76, 0.4);
-  k.add(box(1.9, 0.12, 1.9), 0xffffff, 0, 2.04, 0.4);
-  for (const z of [2.35, -2.35]) k.add(box(2.05, 0.22, 0.2), 0x9a9a9a, 0, 0.55, z);
-  for (const [x, z] of [[-0.95, 1.45], [0.95, 1.45], [-0.95, -1.45], [0.95, -1.45]]) k.add(cyl(0.45, 0.45, 0.35, 8), 0x1c1c1c, x, 0.45, z, 0, 0, Math.PI / 2);
-  for (const x of [-0.65, 0.65]) k.add(box(0.4, 0.2, 0.06), 0xfff4c0, x, 0.95, 2.31);
+function carGeo() { // parked sedan: white body so each instance can be tinted
+  const k = new Kit(), side = new THREE.Shape(), T = 0x1e1e22;
+  [[-2.3, 0.45], [-1.85, 0.4], [1.9, 0.4], [2.3, 0.5], [2.32, 0.85], [2.1, 1.0], [0.85, 1.08], [0.2, 1.55], [-1.2, 1.58], [-1.95, 1.12], [-2.3, 1.05]]
+    .forEach(([x, y], i) => (i ? side.lineTo(x, y) : side.moveTo(x, y)));
+  const body = new THREE.ExtrudeGeometry(side, { depth: 1.84, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 1 });
+  body.rotateY(-Math.PI / 2); body.translate(0.92, 0, 0);
+  k.add(body, 0xffffff, 0, 0, 0, 0, 0, 0, 0.02);
+  const glass = new THREE.Shape();
+  [[0.8, 1.1], [0.22, 1.5], [-1.15, 1.52], [-1.8, 1.12]].forEach(([x, y], i) => (i ? glass.lineTo(x, y) : glass.moveTo(x, y)));
+  const gg = new THREE.ExtrudeGeometry(glass, { depth: 1.9, bevelEnabled: false }); gg.rotateY(-Math.PI / 2); gg.translate(0.95, 0, 0);
+  k.add(gg, 0x2a3646, 0, 0, 0, 0, 0, 0, 0);
+  for (const z of [2.32, -2.32]) k.add(box(1.9, 0.22, 0.14), 0x8a8a90, 0, 0.55, z);
+  for (const [x, z] of [[-0.88, 1.4], [0.88, 1.4], [-0.88, -1.4], [0.88, -1.4]]) { k.add(cyl(0.38, 0.38, 0.28, 12), T, x, 0.38, z, 0, 0, Math.PI / 2); k.add(cyl(0.22, 0.22, 0.3, 8), 0xb0b4ba, x, 0.38, z, 0, 0, Math.PI / 2); }
+  for (const x of [-0.62, 0.62]) { k.add(box(0.4, 0.16, 0.06), 0xfff4c0, x, 0.85, 2.33, 0, 0, 0, 0); k.add(box(0.36, 0.16, 0.06), 0xd9262b, x, 0.9, -2.33, 0, 0, 0, 0); }
   return k.geometry();
 }
 function cowGeo() {
@@ -187,7 +263,7 @@ function cowGeo() {
   for (const [x, z] of [[-0.35, 0.7], [0.35, 0.7], [-0.35, -0.7], [0.35, -0.7]]) k.add(box(0.22, 0.8, 0.22), 0xf4f4f4, x, 0.4, z);
   return k.geometry();
 }
-function baleGeo() { const k = new Kit(); k.add(cyl(0.9, 0.9, 1.4, 8), 0xd9b44e, 0, 0.9, 0, 0, 0, Math.PI / 2); return k.geometry(); }
+function baleGeo() { const k = new Kit(); k.add(cyl(0.9, 0.9, 1.4, 12), 0xcfa94a, 0, 0.9, 0, 0, 0, Math.PI / 2); for (const x of [-0.71, 0.71]) k.add(cyl(0.8, 0.8, 0.02, 12), 0xb8923c, x, 0.9, 0, 0, 0, Math.PI / 2); return k.geometry(); }
 function poleGeo() {
   const k = new Kit();
   k.add(cyl(0.15, 0.2, 9, 5), 0x6e5234, 0, 4.5, 0);
@@ -202,26 +278,25 @@ export function buildWorld(scene) {
   // ---------- terrain ----------
   const Hs = new Float32Array((N + 1) * (N + 1));
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) Hs[j * (N + 1) + i] = heightAt(-HALF + i * CELL, -HALF + j * CELL);
-  const CH = 5, per = N / CH, col = new THREE.Color();
+  const CH = 5, per = N / CH, col = new THREE.Color(), V = per + 1, detail = detailTexture();
+  const groundMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: detail });
   for (let cj = 0; cj < CH; cj++) for (let ci = 0; ci < CH; ci++) {
-    const pos = new Float32Array(per * per * 18), cols = new Float32Array(per * per * 18);
-    let p = 0;
-    for (let j = cj * per; j < (cj + 1) * per; j++) for (let i = ci * per; i < (ci + 1) * per; i++) {
-      const x0 = -HALF + i * CELL, x1 = x0 + CELL, z0 = -HALF + j * CELL, z1 = z0 + CELL;
-      const h00 = Hs[j * (N + 1) + i], h10 = Hs[j * (N + 1) + i + 1], h01 = Hs[(j + 1) * (N + 1) + i], h11 = Hs[(j + 1) * (N + 1) + i + 1];
-      for (const t of [[x0, h00, z0, x0, h01, z1, x1, h10, z0], [x1, h10, z0, x0, h01, z1, x1, h11, z1]]) {
-        faceColor((t[0] + t[3] + t[6]) / 3, (t[2] + t[5] + t[8]) / 3, (t[1] + t[4] + t[7]) / 3, col);
-        const jit = 0.96 + rng() * 0.08;
-        for (let k = 0; k < 9; k++) pos[p + k] = t[k];
-        for (let k = 0; k < 3; k++) { cols[p + k * 3] = col.r * jit; cols[p + k * 3 + 1] = col.g * jit; cols[p + k * 3 + 2] = col.b * jit; }
-        p += 9;
-      }
+    const pos = new Float32Array(V * V * 3), cols = new Float32Array(V * V * 3), uvs = new Float32Array(V * V * 2), idx = [];
+    for (let j = 0; j <= per; j++) for (let i = 0; i <= per; i++) {
+      const gi = ci * per + i, gj = cj * per + j, x = -HALF + gi * CELL, z = -HALF + gj * CELL, h = Hs[gj * (N + 1) + gi], o = j * V + i;
+      faceColor(x, z, h, col);
+      pos[o * 3] = x; pos[o * 3 + 1] = h; pos[o * 3 + 2] = z;
+      cols[o * 3] = col.r; cols[o * 3 + 1] = col.g; cols[o * 3 + 2] = col.b;
+      uvs[o * 2] = x / 7; uvs[o * 2 + 1] = z / 7;
     }
+    for (let j = 0; j < per; j++) for (let i = 0; i < per; i++) { const a = j * V + i, b = a + 1, c = a + V, d = c + 1; idx.push(a, c, b, b, c, d); }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    g.setIndex(idx);
     g.computeVertexNormals();
-    const m = new THREE.Mesh(g, flatMat);
+    const m = new THREE.Mesh(g, groundMat);
     m.receiveShadow = true;
     scene.add(m);
   }
@@ -229,7 +304,7 @@ export function buildWorld(scene) {
   // Patchwork farmland out to the horizon beyond the playable square.
   {
     const S = 60, R = 3000, pos = [], cols = [];
-    const patch = [C(0xe2c15e), C(0x8dc455), C(0x8e5c38), C(0x71b047), C(0x7fb54c), C(0xd3b457)];
+    const patch = [C(0xcdb05a), C(0x78a648), C(0x7d553a), C(0x5f9a3e), C(0x6f9e45), C(0xbfa452)];
     for (let z = -R; z < R; z += S) for (let x = -R; x < R; x += S) {
       if (x + S > -HALF && x < HALF && z + S > -HALF && z < HALF) continue;
       const c = patch[Math.floor(hash(Math.floor(x / 240), Math.floor(z / 240)) * patch.length)];
@@ -243,17 +318,20 @@ export function buildWorld(scene) {
     scene.add(new THREE.Mesh(g, flatMat));
   }
 
+  const wNorm = waterNormals();
+  wNorm.repeat.set(70, 70);
   const water = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2, HALF * 2).rotateX(-Math.PI / 2),
-    new THREE.MeshPhongMaterial({ color: 0x3b8fd4, specular: 0x7fb6e6, shininess: 60 }));
+    new THREE.MeshPhongMaterial({ color: 0x2f6f8f, specular: 0xd8ecff, shininess: 120, normalMap: wNorm, normalScale: new THREE.Vector2(0.5, 0.5), transparent: true, opacity: 0.86 }));
   water.position.y = WATER;
   water.receiveShadow = true;
   scene.add(water);
 
   // ---------- roads ----------
   {
-    const pos = [], cols = [];
+    const pos = [], cols = [], uvs = [];
     const rect = (x0, x1, z0, z1, y00, y01, y10, y11, c) => {
       pos.push(x0, y00, z0, x0, y01, z1, x1, y10, z0, x1, y10, z0, x0, y01, z1, x1, y11, z1);
+      uvs.push(x0 / 5, z0 / 5, x0 / 5, z1 / 5, x1 / 5, z0 / 5, x1 / 5, z0 / 5, x0 / 5, z1 / 5, x1 / 5, z1 / 5);
       for (let k = 0; k < 6; k++) cols.push(c.r, c.g, c.b);
     };
     const yellow = C(0xf2c230), white = C(0xf2f2f2), rails = new Kit();
@@ -280,11 +358,27 @@ export function buildWorld(scene) {
         }
       }
     }
+    // Concrete sidewalks along the streets in town.
+    const walk = C(0xbab6ad);
+    for (const t of TOWNS) for (const R of ROADS) {
+      if (R.c !== (R.v ? t.x : t.z)) continue;
+      const other = ROADS.find(o => o.v !== R.v && o.c === (R.v ? t.z : t.x)), w = R.w / 2;
+      for (let s = (R.v ? t.z : t.x) - t.r; s < (R.v ? t.z : t.x) + t.r; s += CELL) {
+        if (other && Math.abs(s + CELL / 2 - other.c) < other.w / 2 + 4) continue;
+        for (const side of [-1, 1]) {
+          const u0 = side > 0 ? w + 0.4 : -w - 2.6, u1 = u0 + 2.2;
+          const a = (R.v ? heightAt(R.c, s) : heightAt(s, R.c)) + 0.16, b = (R.v ? heightAt(R.c, s + CELL) : heightAt(s + CELL, R.c)) + 0.16;
+          const cc = walk.clone().multiplyScalar(0.95 + rng() * 0.08);
+          if (R.v) rect(R.c + u0, R.c + u1, s, s + CELL, a, b, a, b, cc); else rect(s, s + CELL, R.c + u0, R.c + u1, a, a, b, b, cc);
+        }
+      }
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     g.computeVertexNormals();
-    const roadMat = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    const roadMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: detailTexture(170), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const m = new THREE.Mesh(g, roadMat);
     m.receiveShadow = true;
     scene.add(m);
@@ -342,14 +436,14 @@ export function buildWorld(scene) {
 
   const geos = { tree: roundTree(), pine: pineTree(), fence: fenceGeo(), car: carGeo(), cow: cowGeo(), bale: baleGeo() };
   const sets = {
-    tree: makeSet(geos.tree, 1500), pine: makeSet(geos.pine, 700), house: makeSet(houseGeo(), 260), barn: makeSet(barnGeo(), 40),
+    tree: makeSet(geos.tree, 1500), pine: makeSet(geos.pine, 700), house: makeSet(houseGeo(), 220), house2: makeSet(house2Geo(), 140), barn: makeSet(barnGeo(), 40),
     silo: makeSet(siloGeo(), 40), shop: makeSet(shopGeo(), 60), rubble: makeSet(rubbleGeo(), 400, false), fence: makeSet(geos.fence, 2600),
     car: makeSet(geos.car, 120), cow: makeSet(geos.cow, 140), bale: makeSet(geos.bale, 160), pole: makeSet(poleGeo(), 80),
   };
-  const HOUSE_COL = [0xfff4e0, 0xdfeaf7, 0xf7e3e3, 0xe8f5dc, 0xfff7c9, 0xe9e0f7, 0xf5e6d3];
+  const HOUSE_COL = [0xf6ead6, 0xcfdcea, 0xead2cc, 0xd8e6c8, 0xf1e3b0, 0xd9d0e6, 0xe8d6bf, 0xf4f1ea, 0xb9c9d6];
   const CAR_COL = [0xd23c3c, 0xf2f2f2, 0x3b6fd8, 0x2f2f33, 0xe8b830, 0x4f8a4a, 0x9aa0a8];
   function building(sub, x, z, ry, color) {
-    const spec = { house: [4.6, 52], shop: [6.5, 62], barn: [8, 50], silo: [2.4, 72] }[sub];
+    const spec = { house: [4.6, 52], house2: [4.6, 55], shop: [6.5, 62], barn: [8, 50], silo: [2.4, 72] }[sub];
     const b = breakable('building', sets[sub], x, z, { ry, color, r: spec[0], thr: spec[1], solid: true });
     b.sub = sub;
     b.ri = sets.rubble.add(x, b.y, z, ry, 1, 0xffffff);
@@ -361,7 +455,14 @@ export function buildWorld(scene) {
   // ---------- towns ----------
   const town = new Kit(), lamps = new Kit(), places = [], signs = [];
   const sign = (text, x, y, z, ry, w = 5, bg = '#d9362b') => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: textTexture(text, { bg }), side: THREE.DoubleSide }));
+    const map = textTexture(text, { bg }), m = new THREE.Group();
+    for (const back of [0, 1]) {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map, fog: true }));
+      p.rotation.y = back * Math.PI; p.position.z = back ? -0.03 : 0.03;
+      m.add(p);
+    }
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, w / 4 + 0.2, 0.05), new THREE.MeshLambertMaterial({ color: 0x2a2a2e }));
+    m.add(frame);
     m.position.set(x, y, z); m.rotation.y = ry;
     scene.add(m); signs.push(m);
   };
@@ -444,7 +545,7 @@ export function buildWorld(scene) {
         if (Math.hypot(x - t.x, z - t.z) > t.r + 5 || specials.some(([a, b]) => Math.hypot(x - a, z - b) < 20) || blocked(x, z, 5)) continue;
         const ry = ax ? (side > 0 ? Math.PI : 0) : -side * Math.PI / 2;
         const shop = row === 0 && s < 50 && rng() < 0.6;
-        building(shop ? 'shop' : 'house', x, z, ry, pick(HOUSE_COL));
+        building(shop ? 'shop' : rng() < 0.4 ? 'house2' : 'house', x, z, ry, pick(HOUSE_COL));
         if (row === 0 && rng() < 0.45) {
           const pOff = side * (rw / 2 + 3.2), along = s + rr(-5, 5);
           const px = ax ? t.x + ax * along : t.x + pOff, pz = ax ? t.z + pOff : t.z + az * along;
@@ -486,7 +587,7 @@ export function buildWorld(scene) {
     const cx = (sx > 0 ? f.x0 : f.x1) + sx * 30, cz = (sz > 0 ? f.z0 : f.z1) + sz * 26;
     if (!clear(cx, cz, 10) || !clear(cx + sx * 34, cz + sz * 16, 12)) continue;
     const ry = sz > 0 ? Math.PI : 0;
-    building('house', cx, cz, ry, pick(HOUSE_COL));
+    building(rng() < 0.6 ? 'house2' : 'house', cx, cz, ry, pick(HOUSE_COL));
     building('barn', cx + sx * 22, cz + sz * 6, ry, 0xffffff);
     building('silo', cx + sx * 32, cz + sz * 16, 0, 0xffffff);
     parkedCar(cx + sx * 9, cz - sz * 2, Math.PI / 2);
@@ -673,6 +774,7 @@ export function buildWorld(scene) {
       if (b.kind === 'building') sets.rubble.show(b.ri, true);
     },
     update(dt, now, carPos) {
+      wNorm.offset.x += dt * 0.012; wNorm.offset.y += dt * 0.007;
       let wiresDirty = false;
       for (const p of poles) if (p.falling) {
         p.fall = Math.min(1, p.fall + dt * (0.4 + p.fall * 2));

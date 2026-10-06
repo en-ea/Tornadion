@@ -6,6 +6,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0e1226">
 <meta name="description" content="Low-poly storm chasing game: chase supercells, probe tornadoes, upgrade your interceptor.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tornadion">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;700;800&display=swap">
 <style>
   :root { --ink: #fff; --muted: #b8c0dd; --panel: rgba(12,16,36,.62); --win: #151a36; --win2: #1e2550; --line: #ffffff1f;
@@ -162,6 +169,17 @@
   .ef { text-align: left; border: 0; border-radius: 12px; padding: 10px 12px; color: #fff; box-shadow: 0 3px 0 #0006; } .ef b { font-size: 22px; font-weight: 400; display: block; } .ef small { font-family: "Nunito", sans-serif; font-weight: 700; font-size: 12px; }
   .ef0 { background: #3f8f4f; } .ef1 { background: #7c9a2c; } .ef2 { background: #b8861c; } .ef3 { background: #c4581d; } .ef4 { background: #b8292c; } .ef5 { background: #7d1d8f; }
   .help p { line-height: 1.45; }
+  .vimg { width: 100%; aspect-ratio: 16/9; object-fit: contain; border-radius: 10px; background: radial-gradient(ellipse at 50% 70%, #3a4690, #151a36 70%); }
+  .cust-top { display: flex; gap: 12px; align-items: center; } .cust-top img { width: 46%; max-width: 300px; }
+  #loading { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(ellipse at 50% 120%, #3a2a6e, #0e1226 60%); transition: opacity .5s; }
+  #loading h1 { margin: 0; font-size: clamp(44px, 9vw, 90px); text-shadow: 0 5px 0 var(--blue); } #loading h1 span { color: var(--orange); }
+  #loading p { color: var(--muted); font-weight: 800; margin: 0; }
+  .spin { width: 44px; height: 44px; border-radius: 50%; border: 5px solid #ffffff22; border-top-color: var(--orange); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #rotate { position: fixed; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 30px; background: #0e1226f2; font-weight: 800; }
+  #rotate b { font-size: 64px; display: block; animation: tilt 1.6s ease-in-out infinite; } #rotate button { margin-top: 10px; border: 0; border-radius: 12px; padding: 10px 18px; background: #ffffff1f; color: #fff; font-size: 16px; }
+  @keyframes tilt { 50% { transform: rotate(-90deg); } }
+  @media (orientation: portrait) and (pointer: coarse) { #rotate:not(.dismissed) { display: flex; } }
   @media (max-width: 640px) {
     #title { flex-direction: column; justify-content: center; align-items: flex-start; background: linear-gradient(90deg, rgba(8,10,28,.9), rgba(8,10,28,.45)); }
     #title .menu { width: min(340px, 100%); }
@@ -176,6 +194,8 @@
 </style>
 </head>
 <body>
+<div id="loading"><h1>TORNA<span>DION</span></h1><div class="spin"></div><p>Building the plains…</p></div>
+<div id="rotate"><b>📱</b>Turn your phone sideways for the best view<button onclick="this.parentNode.classList.add('dismissed')">Play in portrait anyway</button></div>
 <canvas id="game"></canvas>
 <div id="flash"></div>
 <div id="scope"></div>

@@ -5,7 +5,7 @@ import { Tornado, CLOUD_BASE } from './tornado.js';
 const DAY = 540; // seconds for a full day/night cycle
 const col = h => new THREE.Color(h);
 const SKY = {
-  dayTop: col(0x4f9fe8), dayHor: col(0xcde9f7), setTop: col(0x4a5a9a), setHor: col(0xffa060),
+  dayTop: col(0x2f7fe0), dayHor: col(0xb9dcf2), setTop: col(0x4a5a9a), setHor: col(0xffa060),
   nightTop: col(0x050a1c), nightHor: col(0x142040), stormTop: col(0x2e3638), stormHor: col(0x5d6a66),
 };
 const EF_WEIGHTS = [0.22, 0.25, 0.22, 0.15, 0.1, 0.06];
@@ -19,6 +19,7 @@ function skyDome() {
       void main(){ vec3 d = normalize(vDir); float h = clamp(d.y, 0.0, 1.0); vec3 c = mix(hor, top, pow(h, 0.55));
         float s = max(dot(d, sunDir), 0.0); c += sunCol * (pow(s, 900.0) * 2.0 + pow(s, 10.0) * 0.25);
         gl_FragColor = vec4(c, 1.0);
+        #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
   });
@@ -42,6 +43,7 @@ const rainMat = () => new THREE.ShaderMaterial({
     void main(){ float a = uOp * (0.55 + 0.45 * sin(vUv.x * 80.0 + sin(vUv.x * 13.0) * 4.0)) * (0.8 + 0.2 * sin(vUv.y * 30.0 + uTime * 6.0 + vUv.x * 40.0));
       a *= smoothstep(0.0, 0.12, vUv.y);
       gl_FragColor = vec4(uCol, a);
+      #include <tonemapping_fragment>
       #include <colorspace_fragment>
       #include <fog_fragment>
     }`,
