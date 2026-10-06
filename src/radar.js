@@ -23,7 +23,7 @@ export function createRadar(world, weather) {
   cv.addEventListener('pointerdown', e => { e.stopPropagation(); big = !big; cv.classList.toggle('big', big); });
   const ECHO = [[0.9, '224,64,251'], [0.7, '255,59,48'], [0.45, '255,214,10'], [0, '52,199,89']];
 
-  function draw(car, { probes = [], surveys = [], rescues = [], range = 450 } = {}) {
+  function draw(car, { probes = [], surveys = [], rescues = [], friends = [], range = 450 } = {}) {
     const dpr = Math.min(devicePixelRatio, 2), W = Math.round(cv.clientWidth * dpr);
     if (!W) return;
     if (cv.width !== W) cv.width = cv.height = W;
@@ -82,6 +82,13 @@ export function createRadar(world, weather) {
       ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
       ctx.fillText(t.rating, X(t.pos.x), Y(t.pos.z) - 12 * dpr);
     }
+    // Other players (co-op)
+    for (const f of friends) {
+      const x = X(f.x), y = Y(f.z), k = 6 * dpr;
+      ctx.fillStyle = f.color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 * dpr;
+      ctx.beginPath(); ctx.arc(x, y, k, 0, 7); ctx.fill(); ctx.stroke();
+      if (big) { ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`; ctx.fillText(f.name, x, y - 13 * dpr); }
+    }
     // Player arrow
     const px = X(car.pos.x), py = Y(car.pos.z), dx = -Math.sin(car.heading), dy = -Math.cos(car.heading), s = 7 * dpr;
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#1700eb'; ctx.lineWidth = 2 * dpr;
@@ -94,5 +101,5 @@ export function createRadar(world, weather) {
     ctx.fillText('N', W / 2, 10 * dpr);
     ctx.restore();
   }
-  return { draw, get big() { return big; } };
+  return { draw, get big() { return big; }, setBig(v) { big = v; cv.classList.toggle('big', v); } };
 }

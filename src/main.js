@@ -7,16 +7,55 @@ import { createDebris } from './debris.js';
 import { createAudio } from './audio.js';
 import { Kit, cyl, box, clamp, flatMat } from './util.js';
 import { createRadar } from './radar.js';
-import { VEHICLES, UPGRADES, PAINTS, DECALS, HORNS, GEAR } from './vehicles.js';
-import { createProbes, PROBE_TYPES } from './probes.js';
+import { VEHICLES } from './vehicles.js';
+import { createProbes } from './probes.js';
 import { createJobs } from './jobs.js';
+import { createProgress } from './progress.js';
+import { createCoop } from './coop.js';
+import { createUI } from './ui.js';
 
 const $ = id => document.getElementById(id);
 const touch = matchMedia('(pointer: coarse)').matches;
-const renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: !touch, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, touch ? 1.25 : 1.5));
-renderer.shadowMap.enabled = true;
 
+// ---------- save data ----------
+const SAVE_KEY = 'tornadion';
+const SAVED = ['money', 'xp', 'owned', 'vehicle', 'up', 'best', 'relaxed', 'shadows', 'sound', 'music', 'musicVol', 'quality', 'gear', 'ptype', 'cust', 'daily', 'rec',
+  'ach', 'log', 'album', 'started', 'tutorialDone', 'playerName'];
+let save = {};
+try { save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch {}
+const S = {
+  money: 500, xp: 0, owned: ['dionado'], vehicle: 'dionado', up: {}, best: [], relaxed: false, shadows: !touch, sound: true, music: true, musicVol: 0.5,
+  quality: touch ? 'medium' : 'high', gear: [], ptype: 'pod', cust: {}, daily: null, rec: {}, ach: {}, log: [], album: [], started: false, tutorialDone: false,
+  playerName: 'Chaser' + Math.floor(Math.random() * 900 + 100),
+  ...Object.fromEntries(SAVED.filter(k => save[k] !== undefined).map(k => [k, save[k]])),
+  zoom: false, paused: true, mode: 'title', savedAt: 0,
+};
+let wiping = false;
+function persist() {
+  if (wiping) return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(Object.fromEntries(SAVED.map(k => [k, S[k]])))); S.savedAt = Date.now(); } catch {}
+}
+setInterval(persist, 5000);
+addEventListener('pagehide', persist);
+document.addEventListener('visibilitychange', () => document.hidden && persist());
+const exportSave = () => JSON.stringify({ game: 'tornadion', version: 1, ...Object.fromEntries(SAVED.map(k => [k, S[k]])) }, null, 1);
+const exportCode = () => 'TORNADION:' + btoa(unescape(encodeURIComponent(JSON.stringify(Object.fromEntries(SAVED.filter(k => k !== 'album').map(k => [k, S[k]]))))));
+function importSave(text) {
+  try {
+    text = (text || '').trim();
+    const data = JSON.parse(text.startsWith('TORNADION:') ? decodeURIComponent(escape(atob(text.slice(10)))) : text);
+    if (typeof data.money !== 'number' || !Array.isArray(data.owned)) throw new Error('bad');
+    if (!confirm('Load this save? Your current progress on this device will be replaced.')) return;
+    wiping = true;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(Object.fromEntries(SAVED.filter(k => data[k] !== undefined).map(k => [k, data[k]]))));
+    location.reload();
+  } catch { alert('That doesn\'t look like a Tornadion save.'); }
+}
+function resetSave() { wiping = true; try { localStorage.removeItem(SAVE_KEY); } catch {} location.href = location.pathname; }
+
+// ---------- renderer & world ----------
+const renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: !touch, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xcde9f7, 200, 1500);
 const camera = new THREE.PerspectiveCamera(65, 1, 0.8, 4000);
@@ -29,19 +68,23 @@ weather.debris = debris;
 const controls = createControls();
 car.reset(-3.5, -40, 0);
 
-// ---------- progress (saved locally) ----------
-let save = {};
-try { save = JSON.parse(localStorage.getItem('tornadion') || '{}'); } catch {}
-const S = {
-  money: save.money ?? 500, xp: save.xp ?? 0, zoom: false, paused: true,
-  owned: save.owned ?? ['dionado'], vehicle: save.vehicle ?? 'dionado', up: save.up ?? {}, best: save.best ?? [],
-  relaxed: !!save.relaxed, shadows: save.shadows ?? !touch, sound: save.sound ?? true,
-  gear: save.gear ?? [], ptype: save.ptype ?? 'pod', cust: save.cust ?? {}, daily: save.daily, rec: save.rec ?? {},
-};
-const SAVED = ['money', 'xp', 'owned', 'vehicle', 'up', 'best', 'relaxed', 'shadows', 'sound', 'gear', 'ptype', 'cust', 'daily', 'rec'];
+function applyGraphics() {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, { low: 0.75, medium: touch ? 1.1 : 1.25, high: touch ? 1.5 : 2 }[S.quality] || 1));
+  renderer.shadowMap.enabled = S.shadows && S.quality !== 'low';
+  scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+  resize();
+}
+function resize() {
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+// ---------- player vehicle ----------
+const vdef = () => VEHICLES.find(v => v.id === S.vehicle) || VEHICLES[0];
 const cust = () => (S.cust[S.vehicle] ??= {});
 const vname = () => cust().name || vdef().name;
-const vdef = () => VEHICLES.find(v => v.id === S.vehicle) || VEHICLES[0];
 function applyVehicle() {
   const hp = car.health / car.maxHealth, win = car.windows;
   car.setVehicle(vdef(), S.up, cust());
@@ -52,43 +95,45 @@ function applyVehicle() {
 }
 S.probes = 99; applyVehicle();
 car.relaxed = S.relaxed;
-renderer.shadowMap.enabled = S.shadows;
 audio.setEnabled(S.sound);
-const radar = createRadar(world, weather);
-const surveys = [];
+audio.setMusic(S.music, S.musicVol);
+applyGraphics();
+
+// ---------- money, toasts ----------
 const level = () => 1 + Math.floor(Math.sqrt(S.xp / 120));
-function toast(msg) {
+function toast(msg, cls = '') {
   const d = document.createElement('div');
-  d.textContent = msg;
+  d.textContent = msg; d.className = cls;
   $('toasts').prepend(d);
-  setTimeout(() => { d.style.opacity = 0; }, 2600);
-  setTimeout(() => d.remove(), 3300);
+  setTimeout(() => { d.style.opacity = 0; }, 2800);
+  setTimeout(() => d.remove(), 3500);
   while ($('toasts').children.length > 4) $('toasts').lastChild.remove();
 }
 function earn(amount, why) {
   const before = level();
+  if (coop.nearFriend()) { amount *= 1.1; why += ' (co-op +10%)'; }
   S.money += amount; S.xp += amount * 0.2 + 5;
+  S.rec.earned = (S.rec.earned || 0) + amount;
   toast(`${why} +$${Math.round(amount).toLocaleString()}`);
   audio.cash();
-  if (level() > before) { toast(`⭐ LEVEL ${level()}!`); audio.levelUp(); }
+  if (level() > before) { toast(`⭐ LEVEL ${level()}!`, 'gold'); audio.levelUp(); }
 }
-const persist = () => { try { localStorage.setItem('tornadion', JSON.stringify(Object.fromEntries(SAVED.map(k => [k, S[k]])))); } catch {} };
-setInterval(persist, 4000);
 const bonus = t => (t.special ? 2 : 1);
+const warnedTown = () => world.TOWNS.find(tw => weather.tornadoes.some(t => t.touch > 0.5 && t.kind !== 'devil' && Math.hypot(t.pos.x - tw.x, t.pos.z - tw.z) < 450));
 
 // ---------- photos ----------
-let photoCd = 0;
+let photoCd = 0, wantPhoto = null;
 const v3 = new THREE.Vector3();
 // Best tornado in the current camera frame and how good a shot it makes (0-1).
 function shot() {
   let best = null, q = 0;
   for (const t of weather.tornadoes) {
     if (t.touch < 0.5) continue;
-    v3.set(t.pos.x, t.pos.y + 30, t.pos.z);
+    v3.set(t.pos.x, t.pos.y + (t.height ? t.height / 3 : 30), t.pos.z);
     const dist = camera.position.distanceTo(v3);
     v3.project(camera);
     if (dist > 1300 || Math.abs(v3.x) > 0.95 || Math.abs(v3.y) > 0.95 || v3.z > 1) continue;
-    const tq = clamp((t.R * 2 + 20) / dist * (S.zoom ? 3 : 1) * 1.8, 0.05, 1) * (1 - weather.info.rain * 0.5) * (1 - 0.3 * Math.hypot(v3.x, v3.y));
+    const tq = clamp((t.R * 2 + 20) / dist * (S.zoom ? 3 : 1) * 1.8, 0.05, 1) * (1 - weather.info.rain * 0.5) * (1 - 0.3 * Math.hypot(v3.x, v3.y)) * (t.rainWrap ? 0.45 : 1);
     if (tq > q) { q = tq; best = t; }
   }
   return { best, q };
@@ -101,23 +146,49 @@ function takePhoto() {
   requestAnimationFrame(() => { $('flash').style.transition = 'opacity .4s'; $('flash').style.opacity = 0; });
   const { best, q } = shot();
   if (!best) return toast('📷 No tornado in frame');
-  earn((60 + 70 * best.ef) * (0.4 + q * 2.6) / (1 + best.photos++) * bonus(best) * (car.perk === 'camera' ? 1.5 : 1), `📷 Photo ${best.label}`);
-  jobs.stat('photo');
+  const rope = best.roping ? 1.5 : 1;
+  const pay = (60 + 70 * best.ef) * (0.4 + q * 2.6) / (1 + best.photos++) * bonus(best) * rope * (car.perk === 'camera' ? 1.5 : 1);
+  earn(pay, `📷 Photo ${best.label}${rope > 1 ? ' roping out!' : ''}`);
+  G.stat('photo'); G.note(best, 'photo', pay);
+  if (rope > 1) progress.unlock('rope');
+  wantPhoto = { label: best.label, pay };
 }
-const warnedTown = () => world.TOWNS.find(tw => weather.tornadoes.some(t => t.touch > 0.5 && Math.hypot(t.pos.x - tw.x, t.pos.z - tw.z) < 450));
+// Grab a small thumbnail of the frame right after it's rendered.
+const thumb = document.createElement('canvas');
+thumb.width = 224; thumb.height = 126;
+function capturePhoto() {
+  const c = renderer.domElement, ar = c.width / c.height, tw = 16 / 9;
+  const sw = ar > tw ? c.height * tw : c.width, sh = ar > tw ? c.height : c.width / tw;
+  thumb.getContext('2d').drawImage(c, (c.width - sw) / 2, (c.height - sh) / 2, sw, sh, 0, 0, thumb.width, thumb.height);
+  progress.addPhoto(thumb.toDataURL('image/jpeg', 0.72), wantPhoto.label, wantPhoto.pay);
+  wantPhoto = null;
+}
+
+// ---------- shared context for the game modules ----------
+const radar = createRadar(world, weather);
+let ui = null;
 const G = {
-  scene, world, weather, car, S, audio, toast, earn, shot, warnedTown, bonus,
-  stat: (...a) => jobs.stat(...a),
+  scene, world, weather, car, S, audio, radar, toast, earn, shot, warnedTown, bonus, level, vdef, cust, vname, applyVehicle, applyGraphics,
+  persist, exportSave, exportCode, importSave, resetSave,
+  stat: (id, n) => { jobs.stat(id, n); progress.onStat(id); },
+  note: (t, key, amt) => progress.note(t, key, amt),
+  unlock: id => progress.unlock(id),
   probeMult: () => (car.perk === 'radar' ? 1.25 : 1),
-  record(t, d, pay) { S.best.push({ r: t.rating, d: Math.round(d), pay: Math.round(pay), s: t.special ? 'mutant' : t.shape }); S.best.sort((a, b) => b.pay - a.pay); S.best.length = Math.min(S.best.length, 10); },
+  record(t, d, pay) { S.best.push({ r: t.rating, d: Math.round(d), pay: Math.round(pay), s: t.special ? 'mutant' : t.kind === 'devil' ? 'dust devil' : t.shape }); S.best.sort((a, b) => b.pay - a.pay); S.best.length = Math.min(S.best.length, 10); },
   setIndicator(txt) { if ($('live').textContent !== txt) { $('live').textContent = txt; $('live').style.display = txt ? 'block' : 'none'; } },
+  setPaused(v) { S.paused = v || S.mode === 'title' || !!ui?.open; last = performance.now(); },
 };
 const probes = createProbes(G);
 const jobs = createJobs(G);
+const progress = createProgress(G);
+const coop = createCoop(G);
+Object.assign(G, { probes, jobs, progress, coop });
+ui = createUI(G);
 
 // ---------- events ----------
 car.onEvent = (e, d) => {
-  if (e === 'fling') toast(d.wasAnchored ? '💥 Anchor ripped out!' : '🌪️ FLUNG!');
+  if (e === 'fling') { toast(d.wasAnchored ? '💥 Anchor ripped out!' : '🌪️ FLUNG!'); progress.unlock('flung'); }
+  if (e === 'land' && d.air > 4) progress.unlock('airtime');
   if (e === 'land' && d.dmg > 5) { toast(`Landed hard (${d.air.toFixed(1)}s airtime)`); audio.crash(1); }
   if (e === 'crash') audio.crash(0.5);
   if (e === 'dead') { toast('💀 DESTROYED, towing to repair shop'); deadT = 3; }
@@ -127,10 +198,18 @@ weather.onStrike = (x, z) => {
   audio.thunder(d);
   if (d < 12) { car.damage(18, 0, 0); toast('⚡ Lightning strike!'); }
 };
-weather.onTornadoSpawn = t => toast(`🌪️ Tornado on the ground! ${t.label}${t.hasTwin ? ' + TWIN' : ''}`);
+weather.onTornadoSpawn = t => {
+  if (t.kind === 'devil') return toast('🌪️ A dust devil is spinning up nearby');
+  if (t.kind === 'landspout') return toast(`🌪️ Landspout touchdown! ${t.rating}`);
+  toast(`🌪️ Tornado on the ground! ${t.label}`);
+};
+weather.onTornadoTurn = t => { if (t.kind !== 'devil' && t.pos.distanceTo(car.pos) < 1500) toast(`↪️ The ${t.rating} just changed direction!`); };
 // Damage surveys: after a tornado dies, flags mark where it did damage.
+const surveys = [];
 const flagGeo = (() => { const k = new Kit(); k.add(cyl(0.06, 0.06, 3, 4), 0xdddddd, 0, 1.5, 0); k.add(box(0.05, 0.7, 1.1), 0xff8a1f, 0, 2.6, 0.55); return k.geometry(); })();
 weather.onTornadoEnd = t => {
+  if (t.silent || t.kind === 'devil') return;
+  jobs.onTornadoEnd(t);
   if (!t.damage.length) return;
   const n = Math.min(4, t.damage.length);
   for (let i = 0; i < n; i++) {
@@ -142,48 +221,38 @@ weather.onTornadoEnd = t => {
   }
   toast(`📋 Tornado dissipated: ${n} damage survey point${n > 1 ? 's' : ''} marked`);
 };
-weather.onTornadoEnd = (end => t => { end(t); jobs.onTornadoEnd(t); })(weather.onTornadoEnd);
 function updateSurveys() {
   for (let i = surveys.length - 1; i >= 0; i--) {
     const s = surveys[i];
     s.mesh.rotation.y += 0.02;
     const hit = Math.hypot(s.x - car.pos.x, s.z - car.pos.z) < 10;
-    if (hit) rateSurvey(s);
+    if (hit) ui.rateSurvey(s, ef => {
+      const off = Math.abs(ef - s.ef);
+      earn(s.pay * (off === 0 ? 1.6 : off === 1 ? 1 : 0.4), `📋 Survey: you said EF${ef}, it was EF${s.ef}${off ? '' : ' ✔'}`);
+      G.stat('survey'); if (!off) G.stat('survey_ace');
+    });
     if (hit || weather.clock > s.until) { scene.remove(s.mesh); surveys.splice(i, 1); }
   }
-}
-// Survey: guess the EF rating from the damage. Right = x1.6, one off = x1, else x0.4.
-function rateSurvey(s) {
-  openPanel('rate');
-  $('rate-btns').innerHTML = [0, 1, 2, 3, 4, 5].map(e => `<button data-ef="${e}">EF${e}</button>`).join('');
-  $('rate-btns').onclick = e => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    const off = Math.abs(+b.dataset.ef - s.ef);
-    closePanels();
-    earn(s.pay * (off === 0 ? 1.6 : off === 1 ? 1 : 0.4), `📋 Survey: you said EF${b.dataset.ef}, it was EF${s.ef}${off ? '' : ' ✔'}`);
-    jobs.stat('survey');
-  };
 }
 let deadT = 0;
 const nearest = type => world.places.filter(p => p.type === type).sort((a, b) => Math.hypot(a.x - car.pos.x, a.z - car.pos.z) - Math.hypot(b.x - car.pos.x, b.z - car.pos.z))[0];
 
 // ---------- camera ----------
-function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-}
-addEventListener('resize', resize);
-resize();
-let camHeading = car.heading;
+let camHeading = car.heading, orbitA = 0;
 const camTarget = new THREE.Vector3(), look = new THREE.Vector3();
 function updateCamera(dt) {
   const baseFov = innerWidth < innerHeight ? 80 : 62;
-  if (S.zoom) {
+  if (S.mode === 'title') { // slow orbit around the vehicle behind the title menu
+    orbitA += dt * 0.12;
+    const r = 13, x = car.pos.x + Math.sin(orbitA) * r, z = car.pos.z + Math.cos(orbitA) * r;
+    camera.position.set(x, Math.max(car.pos.y + 3.2, world.heightAt(x, z) + 1.5), z);
+    look.set(car.pos.x - Math.cos(orbitA) * 3, car.pos.y + 1.6, car.pos.z + Math.sin(orbitA) * 3);
+    camera.lookAt(look);
+    camera.fov = baseFov;
+  } else if (S.zoom) {
     const t = weather.tornadoes.slice().sort((a, b) => a.pos.distanceTo(car.pos) - b.pos.distanceTo(car.pos))[0];
     camera.position.set(car.pos.x, car.pos.y + 3, car.pos.z);
-    if (t) look.set(t.pos.x, t.pos.y + 35, t.pos.z); else look.set(car.pos.x + Math.sin(car.heading) * 100, car.pos.y + 10, car.pos.z + Math.cos(car.heading) * 100);
+    if (t) look.set(t.pos.x, t.pos.y + (t.height ? t.height / 3 : 35), t.pos.z); else look.set(car.pos.x + Math.sin(car.heading) * 100, car.pos.y + 10, car.pos.z + Math.cos(car.heading) * 100);
     camera.lookAt(look);
     camera.fov = 16;
   } else {
@@ -199,7 +268,7 @@ function updateCamera(dt) {
     camera.fov = baseFov;
   }
   camera.updateProjectionMatrix();
-  $('scope').style.display = S.zoom ? 'block' : 'none';
+  $('scope').style.display = S.zoom && S.mode === 'play' ? 'block' : 'none';
 }
 camera.position.set(car.pos.x, car.pos.y + 6, car.pos.z - 12);
 
@@ -212,29 +281,29 @@ function hud(dt) {
   hudT = 0.1;
   $('money').textContent = '$' + Math.round(S.money).toLocaleString();
   $('level').textContent = 'Lv ' + level();
-  $('clock').textContent = weather.info.clock;
+  $('clock').textContent = '🕒 ' + weather.info.clock;
   const l = level(), x0 = 120 * (l - 1) ** 2, x1 = 120 * l ** 2;
   $('xp').firstChild.style.width = clamp((S.xp - x0) / (x1 - x0), 0, 1) * 100 + '%';
   $('hp').firstChild.style.width = car.health / car.maxHealth * 100 + '%';
   $('fuel').firstChild.style.width = car.fuel / car.maxFuel * 100 + '%';
   const pt = probes.type();
-  $('probes').textContent = `${pt.icon} ${pt.name.toUpperCase()} ${S.probes}/${S.probesMax}` + (car.windows > 0.3 ? ' · 🪟 cracked' : '');
+  $('probes').textContent = `${pt.icon} ${pt.name} ${S.probes}/${S.probesMax}` + (car.windows > 0.3 ? ' · 🪟 cracked' : '');
   $('vname').textContent = '🚙 ' + vname();
   $('b-probe').firstChild.nodeValue = pt.icon;
   $('speed').firstChild.nodeValue = Math.round(Math.abs(car.speed) * 2.237);
   const ms = world.mesonets.find(m => Math.hypot(m.x - car.pos.x, m.z - car.pos.z) < 45);
   const msTxt = ms ? ` · 📡 ${ms.id} ${Math.round(weather.windAt(ms.x, ms.z).speed * 2.237)} mph` : '';
   $('wind').textContent = `💨 ${Math.round(car.wind.speed * 2.237)} mph${msTxt}`;
-  const t = weather.tornadoes.slice().sort((a, b) => a.pos.distanceTo(car.pos) - b.pos.distanceTo(car.pos))[0];
-  const s = weather.storms[0];
+  const t = weather.tornadoes.filter(t => t.kind !== 'devil' || t.pos.distanceTo(car.pos) < 500).sort((a, b) => a.pos.distanceTo(car.pos) - b.pos.distanceTo(car.pos))[0];
+  const s = weather.storms.slice().sort((a, b) => a.meso.distanceTo(car.pos) - b.meso.distanceTo(car.pos))[0];
   const bearing = (dx, dz) => DIRS[Math.round(((Math.atan2(-dx, dz) / (Math.PI * 2)) * 8 + 8)) % 8];
   if (t) {
     const dx = t.pos.x - car.pos.x, dz = t.pos.z - car.pos.z;
-    $('tinfo').textContent = `🌪️ ${t.label} · ${Math.round(Math.hypot(dx, dz))}m ${bearing(dx, dz)} · ${Math.round(t.V * 2.237)} mph`;
+    $('tinfo').textContent = `🌪️ ${t.label} · ${Math.round(Math.hypot(dx, dz))} m ${bearing(dx, dz)} · ${Math.round(t.V * 2.237)} mph`;
   } else if (s) {
     const dx = s.meso.x - car.pos.x, dz = s.meso.z - car.pos.z;
-    $('tinfo').textContent = `⛈️ Supercell ${Math.round(Math.hypot(dx, dz))}m ${bearing(dx, dz)}`;
-  } else $('tinfo').textContent = 'Clear skies… storm incoming';
+    $('tinfo').textContent = `⛈️ Supercell ${Math.round(Math.hypot(dx, dz))} m ${bearing(dx, dz)}`;
+  } else $('tinfo').textContent = '☀️ Clear skies · storm forming soon';
   $('b-anchor').classList.toggle('act', car.anchored);
   const warnTown = warnedTown();
   $('warn').textContent = warnTown ? `⚠️ TORNADO WARNING · ${warnTown.name}` : '';
@@ -243,7 +312,9 @@ function hud(dt) {
   $('shop-btn').style.display = dealer && !S.paused ? 'block' : 'none';
   $('b-rec').style.display = S.gear.includes('video') ? '' : 'none';
   $('b-rec').classList.toggle('act', jobs.rec);
+  $('b-ptype').style.display = S.gear.some(g => ['turtle', 'balloon', 'camera', 'rocket', 'drone'].includes(g)) ? '' : 'none';
 }
+$('shop-btn').onclick = () => ui.openShop();
 
 // ---------- loop ----------
 let last = performance.now();
@@ -251,14 +322,20 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(Math.max((now - last) / 1000, 0.001), 0.05);
   last = now;
-  if (S.paused) { controls.input.taps.clear(); renderer.render(scene, camera); return; }
+  coop.update(dt);
+  if (S.paused) {
+    controls.input.taps.clear();
+    if (S.mode === 'title' && !ui.open) { weather.update(dt, car, camera); world.update(dt, weather.clock, car.pos); updateCamera(dt); }
+    renderer.render(scene, camera);
+    return;
+  }
   controls.update();
   const input = controls.input;
   for (const tap of input.taps) {
     if (tap === 'probe') probes.deploy();
     else if (tap === 'ptype') probes.cycle();
     else if (tap === 'rec') jobs.toggleRec();
-    else if (tap === 'map') $('radar').dispatchEvent(new PointerEvent('pointerdown'));
+    else if (tap === 'map') radar.setBig(!radar.big);
     else if (tap === 'anchor') { const r = car.toggleAnchor(); if (r === 'fast') toast('Stop first to anchor'); else if (r === 'none') toast('This vehicle has no anchor'); else if (r !== 'no') { audio.clunk(); toast(r === 'on' ? '⚓ Anchored, shutters down' : 'Anchor up'); } }
     else if (tap === 'photo') takePhoto();
     else if (tap === 'zoom') S.zoom = !S.zoom;
@@ -273,10 +350,12 @@ function frame(now) {
   probes.update(dt);
   updateSurveys();
   jobs.update(dt);
+  progress.update(dt);
+  ui.tutorial.update(dt);
   if (car.perk === 'heal' && !car.dead) car.repair(1.5 * dt);
   for (const t of weather.tornadoes) if (t.special === 'fire' && t.pos.distanceTo(car.pos) < t.R * 1.2) { car.damage(12 * dt); if (shockT <= 0) { shockT = 2; toast('🔥 Burning!'); } }
   radarT -= dt;
-  if (radarT <= 0) { radarT = 0.1; radar.draw(car, { probes: probes.list, surveys, rescues: jobs.rescues, range: car.perk === 'radar' ? 900 : 450 }); }
+  if (radarT <= 0) { radarT = 0.1; radar.draw(car, { probes: probes.list, surveys, rescues: jobs.rescues, friends: coop.friends(), range: car.perk === 'radar' ? 900 : 450 }); }
 
   // Hail, downed power lines, services, respawn.
   if (weather.info.hail > 0.05) { car.hail(weather.info.hail, dt); if (Math.random() < weather.info.hail * dt * 20) audio.clink(); }
@@ -302,74 +381,22 @@ function frame(now) {
     if (deadT <= 0) { const r = nearest('repair'); S.money = Math.max(0, S.money - 300); car.fullRepair(); car.reset(r.x, r.z - 6, Math.PI); car.fuel = Math.max(car.fuel, 40); }
   }
 
-  let roar = 0;
-  for (const t of weather.tornadoes) roar = Math.max(roar, t.touch * (0.4 + 0.12 * t.ef) * (1 - clamp(t.pos.distanceTo(car.pos) / 900, 0, 1)));
-  const siren = world.TOWNS.some(tw => weather.tornadoes.some(t => Math.hypot(t.pos.x - tw.x, t.pos.z - tw.z) < 450) && Math.hypot(car.pos.x - tw.x, car.pos.z - tw.z) < 600) ? 1 : 0;
+  let roar = 0, danger = 0;
+  for (const t of weather.tornadoes) {
+    const near = 1 - clamp(t.pos.distanceTo(car.pos) / 900, 0, 1);
+    roar = Math.max(roar, t.touch * (0.4 + 0.12 * t.ef) * near * (t.kind === 'devil' ? 0.3 : 1));
+    if (t.kind !== 'devil') danger = Math.max(danger, t.touch * Math.min(1, near * 1.6));
+  }
+  audio.setDanger(danger);
+  const siren = world.TOWNS.some(tw => weather.tornadoes.some(t => t.kind !== 'devil' && Math.hypot(t.pos.x - tw.x, t.pos.z - tw.z) < 450) && Math.hypot(car.pos.x - tw.x, car.pos.z - tw.z) < 600) ? 1 : 0;
   audio.update({ speed: car.speed, throttle: input.throttle, boost: car.boosting, wind: car.wind.speed, roar, rain: weather.info.rain, siren, horn: input.horn });
 
   updateCamera(dt);
   hud(dt);
   renderer.render(scene, camera);
+  if (wantPhoto) capturePhoto();
 }
-requestAnimationFrame(frame);
 
-// ---------- menus ----------
-const fmt = n => '$' + Math.round(n).toLocaleString();
-const PANELS = ['menu', 'shop', 'start', 'rate'];
-function openPanel(id) { S.paused = true; for (const p of PANELS) $(p).classList.toggle('hidden', p !== id); }
-function closePanels() { for (const p of PANELS) $(p).classList.add('hidden'); S.paused = false; last = performance.now(); persist(); }
-function renderMenu() {
-  $('o-relaxed').checked = S.relaxed; $('o-shadows').checked = S.shadows; $('o-sound').checked = S.sound;
-  $('missions').innerHTML = jobs.missionsHtml();
-  $('records').textContent = S.rec.wind ? `Highest wind measured: ${S.rec.wind} mph` : 'Buy a handheld anemometer to record peak winds';
-  $('board').innerHTML = S.best.length ? S.best.map(b => `<li>${b.r} ${b.s} · ${b.d}m · ${fmt(b.pay)}</li>`).join('') : '<li>No probe hits yet</li>';
-}
-$('menu-btn').onclick = () => { renderMenu(); openPanel('menu'); };
-$('o-close').onclick = closePanels;
-$('o-relaxed').onchange = e => { S.relaxed = car.relaxed = e.target.checked; };
-$('o-shadows').onchange = e => { S.shadows = renderer.shadowMap.enabled = e.target.checked; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); };
-$('o-sound').onchange = e => { S.sound = e.target.checked; audio.setEnabled(S.sound); };
-$('o-reset').onclick = () => { if (confirm('Reset all money, vehicles and upgrades?')) { try { localStorage.removeItem('tornadion'); } catch {} location.reload(); } };
-const hex = c => '#' + c.toString(16).padStart(6, '0');
-const priceBtn = (attr, price) => `<button ${attr} ${S.money < price ? 'disabled' : ''}>${fmt(price)}</button>`;
-function renderShop() {
-  $('shop-money').textContent = fmt(S.money);
-  $('vlist').innerHTML = VEHICLES.map(v => {
-    const own = S.owned.includes(v.id), cur = v.id === S.vehicle;
-    const btn = cur ? '<button disabled>DRIVING</button>' : own ? `<button data-sel="${v.id}">DRIVE</button>` : priceBtn(`data-buy="${v.id}"`, v.price);
-    return `<div class="item"><div><b>${(S.cust[v.id]?.name && own) ? S.cust[v.id].name + ' · ' : ''}${v.name}</b><small>${v.desc}<br>HP ${v.hp} · weight ${v.mass} · ${Math.round(v.top * 2.237)} mph · ${v.probes} probes${v.anchor ? ' · anchor' : ''}</small></div>${btn}</div>`;
-  }).join('');
-  const c = cust();
-  $('custom').innerHTML = `
-    <label>Name <input id="c-name" maxlength="20" placeholder="${vdef().name}" value="${(c.name || '').replace(/"/g, '&quot;')}"></label>
-    <div class="row">Paint ${PAINTS.map(p => `<button class="sw${(c.paint ?? null) === p ? ' sel' : ''}" data-paint="${p}" style="background:${p == null ? 'repeating-linear-gradient(45deg,#888 0 4px,#ccc 4px 8px)' : hex(p)}" title="${p == null ? 'Factory' : ''}"></button>`).join('')}</div>
-    <div class="row">Decal ${DECALS.map(([id, n]) => `<button class="opt${(c.decal || 'none') === id ? ' sel' : ''}" data-decal="${id}">${n}</button>`).join('')}</div>
-    <div class="row">Horn ${HORNS.map(([id, n]) => `<button class="opt${(c.horn || 'classic') === id ? ' sel' : ''}" data-horn="${id}">${n}</button>`).join('')}</div>
-    <div class="row">Roof light bar <button class="opt${c.bar ? ' sel' : ''}" data-bar="1">${c.bar ? 'ON' : 'OFF'}</button></div>`;
-  $('ulist').innerHTML = UPGRADES.map(u => {
-    const lvl = S.up[u.id] || 0, max = lvl >= u.prices.length;
-    return `<div class="item"><div><b>${u.name}</b><small>${u.desc} · level ${lvl}/${u.prices.length}</small></div>${max ? '<button disabled>MAX</button>' : priceBtn(`data-up="${u.id}"`, u.prices[lvl])}</div>`;
-  }).join('');
-  $('glist').innerHTML = [...PROBE_TYPES.filter(p => p.price), ...GEAR].map(g =>
-    `<div class="item"><div><b>${g.icon ? g.icon + ' ' : ''}${g.name}</b><small>${g.desc}</small></div>${S.gear.includes(g.id) ? '<button disabled>OWNED</button>' : priceBtn(`data-gear="${g.id}"`, g.price)}</div>`).join('');
-}
-$('shop').onclick = e => {
-  const b = e.target.closest('button');
-  if (!b) return;
-  if (b.id === 'shop-close') return closePanels();
-  const c = cust(), d = b.dataset;
-  if (d.buy) { const v = VEHICLES.find(x => x.id === d.buy); S.money -= v.price; S.owned.push(v.id); S.vehicle = v.id; applyVehicle(); audio.cash(); toast(`🚗 Bought ${v.name}!`); }
-  else if (d.sel) { S.vehicle = d.sel; applyVehicle(); toast(`Now driving ${vname()}`); }
-  else if (d.up) { const u = UPGRADES.find(x => x.id === d.up), lvl = S.up[u.id] || 0; S.money -= u.prices[lvl]; S.up[u.id] = lvl + 1; applyVehicle(); audio.cash(); toast(`🔧 ${u.name} level ${lvl + 1}`); }
-  else if (d.gear) { const g = [...PROBE_TYPES, ...GEAR].find(x => x.id === d.gear); S.money -= g.price; S.gear.push(g.id); if (g.icon) S.ptype = g.id; audio.cash(); toast(`🛒 Bought ${g.name}`); }
-  else if ('paint' in d) { c.paint = d.paint === 'null' ? null : +d.paint; applyVehicle(); }
-  else if (d.decal) { c.decal = d.decal; applyVehicle(); }
-  else if (d.horn) { c.horn = d.horn; audio.setHorn(c.horn); }
-  else if (d.bar) { c.bar = !c.bar; applyVehicle(); }
-  else return;
-  persist(); renderShop();
-};
-$('shop').addEventListener('change', e => { if (e.target.id === 'c-name') { cust().name = e.target.value.trim().slice(0, 20); persist(); renderShop(); } });
-$('shop-btn').onclick = () => { renderShop(); openPanel('shop'); };
-$('start').onclick = () => closePanels();
-if (location.search.includes('autostart')) closePanels();
+ui.showTitle();
+if (location.search.includes('autostart')) ui.startGame(false);
+requestAnimationFrame(frame);

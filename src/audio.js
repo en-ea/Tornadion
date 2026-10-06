@@ -2,7 +2,7 @@
 export function createAudio() {
   let ctx = null, master, noiseBuf;
   let eng, engGain, engFilt, jet, wind, rain, sirenGain, hornGain, hornFilt, hornOsc = [], hornType = 'classic';
-  let enabled = true;
+  let enabled = true, musicGain, musicOn = true, musicVol = 0.5, danger = 0, dangerT = 0, nextNote = 0, step = 0;
 
   function loop(type, freq, q = 1) {
     const src = ctx.createBufferSource();
@@ -48,6 +48,12 @@ export function createAudio() {
     sirenGain = ctx.createGain(); sirenGain.gain.value = 0;
     siren.connect(sirenGain).connect(master);
     siren.start(); lfo.start();
+
+    musicGain = ctx.createGain();
+    musicGain.gain.value = musicOn ? musicVol * 0.7 : 0;
+    musicGain.connect(master);
+    nextNote = ctx.currentTime + 0.2;
+    setInterval(schedule, 100);
 
     hornGain = ctx.createGain(); hornGain.gain.value = 0;
     hornFilt = ctx.createBiquadFilter(); hornFilt.type = 'lowpass';
@@ -98,9 +104,48 @@ export function createAudio() {
     o.start(t0); o.stop(t0 + dur + 0.02);
   }
 
+  // ---- music: procedural pads + plucks; drums and a driving bass fade in near tornadoes ----
+  const CALM = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+  const TENSE = [[57, 60, 64], [50, 53, 57], [52, 56, 59], [57, 60, 64]];
+  const SCALE = [57, 60, 62, 64, 67, 69, 72, 74, 76];
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  function mnote(freq, t, dur, type, vol, cut) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+    o.type = type; o.frequency.value = freq; f.type = 'lowpass'; f.frequency.value = cut;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(0.5, dur * 0.25)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f).connect(g).connect(musicGain); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function kick(t, vol) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    o.connect(g).connect(musicGain); o.start(t); o.stop(t + 0.3);
+  }
+  function hat(t, vol) {
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 7000;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    src.connect(f).connect(g).connect(musicGain); src.start(t, Math.random()); src.stop(t + 0.06);
+  }
+  function schedule() {
+    if (!ctx || !musicOn || !enabled || ctx.state !== 'running') { if (ctx) nextNote = ctx.currentTime + 0.1; return; }
+    const sp = 60 / (80 + danger * 40) / 2;
+    while (nextNote < ctx.currentTime + 0.35) {
+      const t = nextNote, s16 = step % 16, ch = (danger > 0.5 ? TENSE : CALM)[Math.floor(step / 16) % 4];
+      if (s16 === 0) { for (const m of ch) mnote(mtof(m - 12), t, sp * 16, 'triangle', 0.045, 900); mnote(mtof(ch[0] - 24), t, sp * 16, 'sine', 0.07, 400); }
+      if (danger < 0.5 ? s16 % 4 === 2 && Math.random() < 0.55 : s16 % 2 === 0) mnote(mtof(SCALE[Math.floor(Math.random() * SCALE.length)]), t, 0.7, 'triangle', 0.03, 2600);
+      if (danger > 0.3) { if (s16 % 4 === 0) kick(t, 0.3 * danger); if (s16 % 2 === 1) hat(t, 0.05 * danger); }
+      if (danger > 0.6 && s16 % 2 === 0) mnote(mtof(ch[0] - 12), t, sp * 0.9, 'sawtooth', 0.035 * danger, 700);
+      nextNote += sp; step++;
+    }
+  }
+
   return {
+    setMusic(on, vol = musicVol) { musicOn = on; musicVol = vol; if (musicGain) musicGain.gain.setTargetAtTime(on ? vol * 0.7 : 0, ctx.currentTime, 0.3); },
+    setDanger(v) { dangerT = v; },
     update({ speed, throttle, boost, wind: w, roar, rain: r, siren, horn }) {
       if (!ctx) return;
+      danger += (dangerT - danger) * 0.01;
       const rpm = 45 + Math.abs(speed) * 2.4 + Math.abs(throttle) * 18;
       set(eng[0].frequency, rpm); set(eng[1].frequency, rpm * 0.5);
       set(engFilt.frequency, 300 + Math.abs(throttle) * 900 + Math.abs(speed) * 15);
@@ -128,6 +173,7 @@ export function createAudio() {
     clunk() { tone(90, 0.2, 'square', 0.18); burst({ dur: 0.15, freq: 600, vol: 0.2 }); },
     zap() { burst({ dur: 0.2, freq: 2000, type: 'bandpass', vol: 0.3, q: 4 }); },
     levelUp() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'square', 0.08, i * 0.1)); },
+    honk() { if (!ctx) return; const t = ctx.currentTime; hornGain.gain.cancelScheduledValues(t); hornGain.gain.setTargetAtTime(0.12, t, 0.02); hornGain.gain.setTargetAtTime(0, t + 0.45, 0.04); },
     setHorn(t) { hornType = t || 'classic'; if (ctx) buildHorn(); },
     rec() { tone(660, 0.08, 'sine', 0.12); tone(990, 0.12, 'sine', 0.12, 0.08); },
     whoosh() { burst({ dur: 0.9, freq: 1200, type: 'bandpass', vol: 0.3, q: 0.8 }); },

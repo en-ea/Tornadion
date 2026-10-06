@@ -54,14 +54,14 @@ export function createJobs(G) {
       if (m.have >= m.n) { m.done = true; G.earn(m.pay, `✅ Daily mission: ${mText(m)}`); }
     }
   }
-  const missionsHtml = () => daily().list.map(m => `<li>${m.done ? '✅' : '⬜'} ${mText(m)} <small>${m.id === 'km' ? m.have.toFixed(1) : m.have}/${m.n} · $${m.pay}</small></li>`).join('');
+  const missionsHtml = () => daily().list.map(m => `<div class="mission${m.done ? ' done' : ''}"><span>${m.done ? '✅' : '🎯'}</span><div><b>${mText(m)}</b><i class="bar"><b style="width:${Math.round(m.have / m.n * 100)}%"></b></i><small>${m.id === 'km' ? m.have.toFixed(1) : m.have} / ${m.n}</small></div><em>$${m.pay}</em></div>`).join('');
 
   function toggleRec() {
     if (!S.gear.includes('video')) return G.toast('🎥 Buy a video camera at the dealership');
     rec = !rec;
     G.audio.rec();
     if (rec) { recT = 0; recVal = 0; G.toast('🎥 Recording…'); return; }
-    if (recVal > 5) { G.earn(recVal, `🎥 Footage sold (${Math.round(recT)}s)`); stat('video'); }
+    if (recVal > 5) { G.earn(recVal, `🎥 Footage sold (${Math.round(recT)}s)`); G.stat('video'); }
     else G.toast('🎥 No tornado on tape');
   }
 
@@ -81,7 +81,7 @@ export function createJobs(G) {
       if (mph > (S.rec.wind || 0)) { S.rec.wind = mph; amt += 150; label += ' · NEW RECORD'; }
       G.earn(amt, label);
     }
-    if (t.damage.length > 2) {
+    if (t.damage.length > 2 && t.kind !== 'devil') {
       const n = t.ef >= 3 ? 2 : 1;
       for (let i = 0; i < n; i++) { const d = t.damage[Math.floor((i + 0.3) / n * t.damage.length)]; spawnRescue(d.x - 5, d.z + 4, t.ef); }
       G.toast(`🆘 ${n} ${n > 1 ? 'people need' : 'person needs'} rescuing (yellow ◆ on map)`);
@@ -90,8 +90,8 @@ export function createJobs(G) {
 
   function update(dt) {
     const gear = S.gear, mph = car.wind.speed * 2.237;
-    stat('km', Math.abs(car.speed) * dt / 1000);
-    if (mph >= 100 && !car.dead) stat('wind');
+    G.stat('km', Math.abs(car.speed) * dt / 1000);
+    if (mph >= 100 && !car.dead) G.stat('wind');
 
     // Gear: rain gauge, hail collector.
     if (gear.includes('gauge') && weather.info.rain > 0.35) { rainAcc += weather.info.rain * dt; if (rainAcc > 25) { rainAcc = 0; G.earn(70, '🌧️ Rainfall data sold'); } }
@@ -99,17 +99,17 @@ export function createJobs(G) {
 
     // Storm reports (tornado on the ground near you, large hail).
     hailCd -= dt;
-    if (weather.info.hail > 0.3 && hailCd <= 0) { hailCd = 300; G.earn(40, '📣 Storm report: large hail'); stat('report'); }
+    if (weather.info.hail > 0.3 && hailCd <= 0) { hailCd = 300; G.earn(40, '📣 Storm report: large hail'); G.stat('report'); }
     for (const t of weather.tornadoes) {
       const d = Math.hypot(t.pos.x - car.pos.x, t.pos.z - car.pos.z);
-      if (!t.reported && t.touch > 0.5 && d < 700) { t.reported = true; G.earn(50 + 30 * t.ef, `📣 Storm report: ${t.rating} tornado`); stat('report'); }
+      if (!t.reported && t.kind !== 'devil' && t.touch > 0.5 && d < 700) { t.reported = true; G.earn(50 + 30 * t.ef, `📣 Storm report: ${t.rating} tornado`); G.stat('report'); }
       if (d < t.R * 5) t.peakWind = Math.max(t.peakWind || 0, car.wind.speed);
       // Core punch: get inside the funnel and drive back out alive.
       if (car.dead) t.inCore = false;
-      else if (t.touch > 0.6 && d < t.R * 0.7) t.inCore = true;
+      else if (t.touch > 0.6 && t.kind !== 'devil' && d < t.R * 0.7) t.inCore = true;
       else if (t.inCore && d > t.R * 1.4) {
         t.inCore = false;
-        if (!t.punched) { t.punched = true; G.earn((250 + 180 * t.ef) * G.bonus(t), `🌀 CORE PUNCH ${t.rating}!`); stat('core'); }
+        if (!t.punched) { t.punched = true; const amt = (250 + 180 * t.ef) * G.bonus(t); G.earn(amt, `🌀 CORE PUNCH ${t.rating}!`); G.stat('core'); G.note(t, 'core', amt); }
       }
     }
 
@@ -121,7 +121,7 @@ export function createJobs(G) {
       if (rec && best) recVal += q * (20 + 18 * best.ef) * G.bonus(best) * 0.25 * (car.perk === 'camera' ? 1.5 : 1);
       const town = G.warnedTown();
       live = !!(town && best && q > 0.12 && best.pos.distanceTo(car.pos) < 1200);
-      if (live) { tvAcc += (4 + 3 * best.ef) * Math.min(1, q * 2) * 0.25; if (liveT === 0) { G.toast(`📺 You're LIVE on TV over ${town.name}!`); stat('tv'); } }
+      if (live) { tvAcc += (4 + 3 * best.ef) * Math.min(1, q * 2) * 0.25; if (liveT === 0) { G.toast(`📺 You're LIVE on TV over ${town.name}!`); G.stat('tv'); } }
     }
     const payTV = () => { if (tvAcc > 1) G.earn(tvAcc, '📺 TV station paid for live footage'); tvAcc = 0; };
     if (live) { liveT += dt; if (liveT > 15) { payTV(); liveT = 0.001; } }
@@ -136,7 +136,7 @@ export function createJobs(G) {
       r.mk.rotation.y += 2 * dt; r.mk.position.y = 3 + Math.sin(r.t * 3) * 0.25;
       r.g.rotation.y = Math.atan2(car.pos.x - r.x, car.pos.z - r.z);
       const near = Math.hypot(r.x - car.pos.x, r.z - car.pos.z) < 8 && Math.abs(car.speed) < 3 && !car.dead;
-      if (near) { G.earn((150 + 50 * r.ef) * (car.perk === 'heal' ? 2 : 1), '🚑 Rescued a stranded person'); stat('rescue'); }
+      if (near) { G.earn((150 + 50 * r.ef) * (car.perk === 'heal' ? 2 : 1), '🚑 Rescued a stranded person'); G.stat('rescue'); }
       if (near || r.t > 300) { scene.remove(r.g); rescues.splice(i, 1); }
     }
 

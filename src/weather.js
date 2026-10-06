@@ -47,9 +47,11 @@ const rainMat = () => new THREE.ShaderMaterial({
     }`,
 });
 
+let stormId = 0;
 class Storm {
   constructor(scene, x, z, vx, vz) {
-    this.scene = scene;
+    this.scene = scene; this.nid = ++stormId;
+    this.landspoutAt = rng() < 0.35 ? rr(14, 24) : -1;
     this.meso = new THREE.Vector3(x, 0, z);
     this.vel = new THREE.Vector3(vx, 0, vz);
     this.heading = Math.atan2(vx, vz);
@@ -134,8 +136,10 @@ export function createWeather(scene, world, audio) {
   const W = {
     time: 0.28, clock: 0, storms: [], tornadoes: [], debris: null, flash: 0,
     info: { rain: 0, hail: 0, dark: 0, light: 1, night: 0, clock: '' },
-    onTornadoEnd: null, onStrike: null, onTornadoSpawn: null,
+    onTornadoEnd: null, onStrike: null, onTornadoSpawn: null, onTornadoTurn: null,
+    remote: false, // co-op guest: storms/tornadoes come from the host instead of spawning locally
   };
+  const devils = [], deadIds = new Set();
   const sky = skyDome();
   scene.add(sky);
   const hemi = new THREE.HemisphereLight(0xe8f6ff, 0x5a7a3a, 1.3);
@@ -221,11 +225,16 @@ export function createWeather(scene, world, audio) {
   function spawnTornado(storm) {
     let r = rng(), ef = 0;
     while (ef < 5 && r > EF_WEIGHTS[ef]) { r -= EF_WEIGHTS[ef]; ef++; }
-    const shape = ef <= 1 ? (rng() < 0.4 ? 'rope' : 'cone') : ef <= 3 ? ['cone', 'cone', 'wedge', 'rope'][Math.floor(rng() * 4)] : (rng() < 0.65 ? 'wedge' : 'cone');
+    const shape = ef <= 1 ? (rng() < 0.4 ? 'rope' : 'cone') : ef <= 3 ? ['cone', 'cone', 'wedge', 'rope', 'stovepipe'][Math.floor(rng() * 5)] : ['wedge', 'wedge', 'cone', 'stovepipe'][Math.floor(rng() * 4)];
     const r2 = rng(), special = r2 < 0.1 ? ['multi', 'fire', 'mega', 'drifter'][Math.floor(rng() * 4)] : null;
     if (special === 'multi') ef = Math.max(ef, 3);
-    const main = new Tornado(scene, world, storm, { ef, shape, offset: { x: storm.lx * -10, z: storm.lz * -10 }, special });
+    const rainWrap = !special && ef >= 2 && rng() < 0.2;
+    const main = new Tornado(scene, world, storm, { ef, shape, offset: { x: storm.lx * -10, z: storm.lz * -10 }, special, rainWrap });
     storm.tornadoes.push(main); W.tornadoes.push(main);
+    if (!special && ef >= 3 && rng() < 0.3) { // satellite circling the main funnel
+      const sat = new Tornado(scene, world, storm, { ef: rng() < 0.6 ? 0 : 1, shape: 'rope', offset: { x: 0, z: 0 }, kind: 'satellite', parent: main });
+      sat.form = 25; storm.tornadoes.push(sat); W.tornadoes.push(sat);
+    }
     if (!special && rng() < 0.18) {
       const ef2 = Math.max(0, ef - Math.floor(rng() * 3));
       const tw = new Tornado(scene, world, storm, { ef: ef2, shape: ef2 >= 4 ? 'wedge' : rng() < 0.5 ? 'rope' : 'cone', offset: { x: storm.lx * 120, z: storm.lz * 120 }, twin: true });
@@ -255,6 +264,62 @@ export function createWeather(scene, world, audio) {
   W.rainAt = (x, z) => W.storms.reduce((m, s) => Math.max(m, s.rainAt(x, z)), 0);
   W.hailAt = (x, z) => W.storms.reduce((m, s) => Math.max(m, s.hailAt(x, z)), 0);
 
+  // Dust devils: small fair-weather whirls that wander across fields on calm, sunny days.
+  function spawnDevil(car) {
+    const a = rr(0, 6.28), d = rr(150, 350), x = car.pos.x + Math.cos(a) * d, z = car.pos.z + Math.sin(a) * d;
+    if (Math.abs(x) > world.HALF - 40 || Math.abs(z) > world.HALF - 40 || world.surfaceAt(x, z) === 'water') return;
+    const fake = { meso: new THREE.Vector3(x, 0, z), vel: new THREE.Vector3(rr(-3, 3), 0, rr(-3, 3)), tornadoes: [], fake: true };
+    const t = new Tornado(scene, world, fake, { ef: 0, shape: 'rope', offset: { x: 0, z: 0 }, kind: 'devil' });
+    fake.tornadoes.push(t); devils.push(fake); W.tornadoes.push(t);
+    W.onTornadoSpawn?.(t);
+  }
+  let devilT = 30;
+
+  // ---- co-op sync: the host sends snapshots, guests mirror them ----
+  W.snapshot = () => ({
+    time: W.time,
+    storms: W.storms.map(s => ({ id: s.nid, x: s.meso.x, z: s.meso.z, vx: s.vel.x, vz: s.vel.z, age: s.age, life: s.life, h: s.hailiness })),
+    tor: W.tornadoes.map(t => ({
+      id: t.id, sid: t.storm.fake ? 0 : t.storm.nid, ef: t.ef, shape: t.shape, special: t.special, kind: t.kind, rw: t.rainWrap, twin: t.twin,
+      parent: t.parent?.id ?? 0, age: t.age, life: t.life, form: t.form, x: t.pos.x, z: t.pos.z, Rmax: t.Rmax, Vmax: t.Vmax, h: t.height ?? 0,
+    })),
+  });
+  W.applySnapshot = st => {
+    if (!W.synced) { // first snapshot after joining: drop our own local weather
+      W.synced = true;
+      for (const s of W.storms) s.dispose();
+      W.storms.length = 0;
+      for (const t of W.tornadoes) { t.silent = true; t.kill(); }
+    }
+    W.time = st.time;
+    const sIds = new Set(st.storms.map(s => s.id));
+    for (let i = W.storms.length - 1; i >= 0; i--) if (!sIds.has(W.storms[i].nid)) { W.storms[i].dispose(); W.storms.splice(i, 1); }
+    for (const s of st.storms) {
+      let o = W.storms.find(x => x.nid === s.id);
+      if (!o) { o = new Storm(scene, s.x, s.z, s.vx, s.vz); o.nid = s.id; o.landspoutAt = -1; W.storms.push(o); }
+      if (Math.hypot(o.meso.x - s.x, o.meso.z - s.z) > 40) o.meso.set(s.x, 0, s.z);
+      else { o.meso.x += (s.x - o.meso.x) * 0.3; o.meso.z += (s.z - o.meso.z) * 0.3; }
+      o.age = s.age; o.life = s.life; o.hailiness = s.h;
+    }
+    const tIds = new Set(st.tor.map(t => t.id));
+    for (const t of W.tornadoes) if (!tIds.has(t.nid)) t.kill();
+    for (const d of st.tor) {
+      let t = W.tornadoes.find(x => x.nid === d.id);
+      if (!t) {
+        if (deadIds.has(d.id)) continue;
+        const storm = d.sid ? W.storms.find(s => s.nid === d.sid) : { meso: new THREE.Vector3(d.x, 0, d.z), vel: new THREE.Vector3(), tornadoes: [], fake: true };
+        if (!storm) continue;
+        t = new Tornado(scene, world, storm, { ef: d.ef, shape: d.shape, offset: { x: d.x - storm.meso.x, z: d.z - storm.meso.z }, special: d.special, kind: d.kind, rainWrap: d.rw, twin: d.twin });
+        t.nid = d.id; t.Rmax = d.Rmax; t.Vmax = d.Vmax; t.form = d.form; if (d.h) t.height = d.h;
+        storm.tornadoes.push(t); W.tornadoes.push(t);
+        if (d.age < 20) W.onTornadoSpawn?.(t);
+      }
+      t.age = d.age; t.life = d.life; t.netPos = { x: d.x, z: d.z };
+      if (d.parent) t.parent = W.tornadoes.find(x => x.nid === d.parent) || null;
+      if (t.storm.fake) t.storm.meso.set(d.x, 0, d.z);
+    }
+  };
+
   let nextStorm = 8, destroyT = 0;
   const light = new THREE.Color();
 
@@ -263,11 +328,20 @@ export function createWeather(scene, world, audio) {
     W.time = (W.time + dt / DAY) % 1;
 
     // ---- storms & tornadoes ----
-    if (!W.storms.length) { nextStorm -= dt; if (nextStorm <= 0) spawnStorm(car); }
+    if (!W.remote && !W.storms.length) { nextStorm -= dt; if (nextStorm <= 0) spawnStorm(car); }
     for (let i = W.storms.length - 1; i >= 0; i--) {
       const s = W.storms[i];
-      if (!s.update(dt, W.clock) && !s.tornadoes.length) { s.dispose(); W.storms.splice(i, 1); nextStorm = rr(12, 25); continue; }
-      if (!s.tornadoes.length && s.age > 28 && s.age < s.life - 70 && s.count < 3) { s.cool -= dt; if (s.cool <= 0) { spawnTornado(s); s.cool = rr(18, 32); } }
+      const alive = s.update(dt, W.clock);
+      if (W.remote) { s.tornadoes = s.tornadoes.filter(x => x.alive); }
+      else {
+        if (!alive && !s.tornadoes.length) { s.dispose(); W.storms.splice(i, 1); nextStorm = rr(12, 25); continue; }
+        if (!s.tornadoes.length && s.age > 28 && s.age < s.life - 70 && s.count < 3) { s.cool -= dt; if (s.cool <= 0) { spawnTornado(s); s.cool = rr(18, 32); } }
+        if (s.landspoutAt > 0 && s.age > s.landspoutAt) { // weak landspout under the young storm's updraft
+          s.landspoutAt = -1;
+          const ls = new Tornado(scene, world, s, { ef: rng() < 0.7 ? 0 : 1, shape: 'rope', offset: { x: s.fx * 60 + s.lx * 40, z: s.fz * 60 + s.lz * 40 }, kind: 'landspout' });
+          s.tornadoes.push(ls); W.tornadoes.push(ls); W.onTornadoSpawn?.(ls);
+        }
+      }
       s.lightT -= dt;
       if (s.lightT <= 0 && s.power > 0.3) {
         s.lightT = rr(2.5, 8) / s.power;
@@ -278,11 +352,23 @@ export function createWeather(scene, world, audio) {
         strike(x, z);
       }
     }
+    // Dust devils on calm sunny days.
+    if (!W.remote) {
+      devilT -= dt;
+      if (devilT <= 0) { devilT = rr(45, 90); if (W.info.dark < 0.2 && W.info.night < 0.4 && devils.length < 1) spawnDevil(car); }
+    }
+    for (let i = devils.length - 1; i >= 0; i--) {
+      const d = devils[i];
+      d.vel.x += rr(-1, 1) * dt; d.vel.z += rr(-1, 1) * dt; d.vel.clampLength(1, 4);
+      if (!W.remote) d.meso.addScaledVector(d.vel, dt);
+      if (!d.tornadoes[0].alive) devils.splice(i, 1);
+    }
     const lvl = W.info.light;
     for (let i = W.tornadoes.length - 1; i >= 0; i--) {
       const t = W.tornadoes[i];
       t.update(dt, W.clock, lvl);
-      if (!t.alive) { W.tornadoes.splice(i, 1); W.onTornadoEnd?.(t); }
+      if (t.turned) { t.turned = false; W.onTornadoTurn?.(t); }
+      if (!t.alive) { W.tornadoes.splice(i, 1); if (t.nid) deadIds.add(t.nid); W.onTornadoEnd?.(t); }
     }
     // Tornado damage to the world (checked a few times per second).
     destroyT -= dt;

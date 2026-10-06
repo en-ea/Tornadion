@@ -581,3 +581,23 @@ export function createCar(scene) {
   };
   return car;
 }
+
+// Stand-alone vehicle model (used for other players' cars in co-op).
+let ghostWheel = null;
+export function vehicleModel(d, cust = {}) {
+  const g = d.build ? d.build() : { body: buildModel(), lights: lightsGeo() };
+  if (cust.paint != null && d.paint) repaint(g.body, d.paint, cust.paint);
+  const root = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const body = new THREE.Mesh(g.body, mat);
+  body.castShadow = true;
+  root.add(body, new THREE.Mesh(g.lights, new THREE.MeshBasicMaterial({ vertexColors: true })));
+  const wr = d.wr || 0.62, wb = d.wb || 1.5, tr = d.track || 1.08;
+  ghostWheel ??= wheelGeo();
+  root.userData.wheels = [[-tr, wb], [tr, wb], [-tr, -wb], [tr, -wb]].map(([x, z]) => {
+    const w = new THREE.Mesh(ghostWheel, mat);
+    w.position.set(x, wr, z); w.scale.setScalar(wr / 0.62);
+    root.add(w);
+    return w;
+  });
+  return root;
+}

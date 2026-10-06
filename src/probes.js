@@ -114,7 +114,7 @@ export function createProbes(G) {
   function scored(t, d, amount, what) {
     G.earn(amount, `${what} ${t.rating} ${Math.round(d)}m`);
     G.stat('probe'); if (t.ef >= 3) G.stat('ef3');
-    G.record(t, d, amount);
+    G.record(t, d, amount); G.note(t, 'probe', amount);
   }
   function suck(p, t) { p.state = 'hit'; p.t = 0; p.torn = t; p.ang = Math.atan2(p.pos.z - t.pos.z, p.pos.x - t.pos.x); p.rad = Math.max(3, dist2(p.pos, t.pos)); }
 
@@ -211,7 +211,7 @@ export function createProbes(G) {
       } else if (p.state === 'fly' || p.state === 'orbit') { // drone
         const t = p.torn, R = t.R * 2.2 + 15;
         if (!t.alive || (p.state === 'orbit' && p.t > 12)) {
-          if (p.data > 0) { G.earn(p.data, `🛸 Drone data from the ${t.rating}`); G.stat('probe'); }
+          if (p.data > 0) { G.earn(p.data, `🛸 Drone data from the ${t.rating}`); G.stat('probe'); G.stat('drone'); G.note(t, 'probe', p.data); }
           if (t.alive && Math.random() < 0.3) { G.toast('🛸 Drone got sucked into the vortex!'); suck(p, t); }
           else { p.state = 'home'; G.toast('🛸 Drone flying home'); }
           continue;
